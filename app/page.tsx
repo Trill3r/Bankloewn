@@ -28,8 +28,9 @@ export default function Home() {
 
   useEffect(() => {
     fetch("/api/tournaments")
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then(setTournaments)
+      .catch(() => setTournaments([]))
       .finally(() => setLoading(false));
   }, []);
 

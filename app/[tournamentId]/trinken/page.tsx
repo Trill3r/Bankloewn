@@ -59,27 +59,20 @@ export default function TrinkenPage() {
     const saved = localStorage.getItem(`profile_${tournamentId}`);
     if (saved) setCurrentProfile(JSON.parse(saved));
 
+    const safe = (p: Promise<Response>) => p.then((r) => (r.ok ? r.json() : [])).catch(() => []);
     Promise.all([
-      fetch(`/api/profiles?tournamentId=${tournamentId}`).then((r) => r.json()).catch(() => []),
-      fetch(`/api/drinks?tournamentId=${tournamentId}`).then((r) => r.json()),
-      fetch(`/api/drink-entries?tournamentId=${tournamentId}`).then((r) => r.json()),
-      fetch(`/api/vomit-entries?tournamentId=${tournamentId}`).then((r) => r.json()),
-    ]).then(([p, d, de, ve]) => {
-      // profiles come from tournament endpoint
-      fetch(`/api/tournaments/${tournamentId}`).then((r) => r.json()).then((t) => {
-        if (t.profiles) setProfiles(t.profiles);
-      });
-      setDrinks(d);
-      setDrinkEntries(de);
-      setVomitEntries(ve);
+      safe(fetch(`/api/drinks?tournamentId=${tournamentId}`)),
+      safe(fetch(`/api/drink-entries?tournamentId=${tournamentId}`)),
+      safe(fetch(`/api/vomit-entries?tournamentId=${tournamentId}`)),
+    ]).then(([d, de, ve]) => {
+      setDrinks(Array.isArray(d) ? d : []);
+      setDrinkEntries(Array.isArray(de) ? de : []);
+      setVomitEntries(Array.isArray(ve) ? ve : []);
     });
-  }, [tournamentId]);
-
-  // Fetch profiles separately
-  useEffect(() => {
     fetch(`/api/tournaments/${tournamentId}`)
-      .then((r) => r.json())
-      .then((t) => { if (t.profiles) setProfiles(t.profiles); });
+      .then((r) => (r.ok ? r.json() : null))
+      .then((t) => { if (t?.profiles) setProfiles(t.profiles); })
+      .catch(() => {});
   }, [tournamentId]);
 
   // Pusher realtime
