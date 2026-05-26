@@ -9,13 +9,13 @@ datasource db {
 }
 
 model Tournament {
-  id           String       @id @default(cuid())
+  id           String         @id @default(cuid())
   name         String
   date         DateTime
   location     String
   pinCode      String
-  status       String       @default("active")
-  createdAt    DateTime     @default(now())
+  status       String         @default("active")
+  createdAt    DateTime       @default(now())
   profiles     Profile[]
   drinkEntries DrinkEntry[]
   vomitEntries VomitEntry[]
@@ -24,16 +24,17 @@ model Tournament {
 }
 
 model Profile {
-  id           String       @id @default(cuid())
-  nickname     String
-  avatarColor  String
-  tournamentId String
-  tournament   Tournament   @relation(fields: [tournamentId], references: [id])
-  createdAt    DateTime     @default(now())
-  drinkEntries DrinkEntry[]
-  vomitEntries VomitEntry[]
-  gameLineups  GameLineup[]
-  gameStats    GameStat[]
+  id              String          @id @default(cuid())
+  nickname        String
+  avatarColor     String
+  tournamentId    String
+  tournament      Tournament      @relation(fields: [tournamentId], references: [id])
+  createdAt       DateTime        @default(now())
+  drinkEntries    DrinkEntry[]
+  vomitEntries    VomitEntry[]
+  gameLineups     GameLineup[]
+  gameStats       GameStat[]
+  gameAttendances GameAttendee[]
 }
 
 model Drink {
@@ -49,18 +50,20 @@ model Drink {
 }
 
 model DrinkEntry {
-  id             String     @id @default(cuid())
-  profileId      String
-  profile        Profile    @relation(fields: [profileId], references: [id])
-  drinkId        String
-  drink          Drink      @relation(fields: [drinkId], references: [id])
-  volumeMl       Int
-  alcoholPercent Float
-  consumedAt     DateTime   @default(now())
-  isTrichter     Boolean    @default(false)
-  tournamentId   String
-  tournament     Tournament @relation(fields: [tournamentId], references: [id])
-  createdAt      DateTime   @default(now())
+  id              String     @id @default(cuid())
+  profileId       String
+  profile         Profile    @relation(fields: [profileId], references: [id])
+  drinkId         String
+  drink           Drink      @relation(fields: [drinkId], references: [id])
+  volumeMl        Int
+  alcoholPercent  Float
+  consumedAt      DateTime   @default(now())
+  isTrichter      Boolean    @default(false)
+  durationSeconds Int?
+  timekeeperId    String?
+  tournamentId    String
+  tournament      Tournament @relation(fields: [tournamentId], references: [id])
+  createdAt       DateTime   @default(now())
 }
 
 model VomitEntry {
@@ -75,19 +78,31 @@ model VomitEntry {
 }
 
 model Game {
-  id           String       @id @default(cuid())
+  id           String         @id @default(cuid())
   tournamentId String
-  tournament   Tournament   @relation(fields: [tournamentId], references: [id])
+  tournament   Tournament     @relation(fields: [tournamentId], references: [id])
   name         String
   opponentName String
-  scoreUs      Int          @default(0)
-  scoreThem    Int          @default(0)
-  status       String       @default("planned")
+  scoreUs      Int            @default(0)
+  scoreThem    Int            @default(0)
+  status       String         @default("planned")
   startedAt    DateTime?
   endedAt      DateTime?
-  createdAt    DateTime     @default(now())
+  createdAt    DateTime       @default(now())
   lineups      GameLineup[]
   stats        GameStat[]
+  attendees    GameAttendee[]
+}
+
+model GameAttendee {
+  id        String   @id @default(cuid())
+  gameId    String
+  game      Game     @relation(fields: [gameId], references: [id])
+  profileId String
+  profile   Profile  @relation(fields: [profileId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([gameId, profileId])
 }
 
 model GameLineup {

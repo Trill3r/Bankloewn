@@ -6,6 +6,15 @@ export const metadata: Metadata = {
   title: "Banklöwen 🦁",
   description: "Volleyballfreizeit Tracker",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/icon.svg",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Banklöwen",
+  },
 };
 
 export const viewport: Viewport = {
