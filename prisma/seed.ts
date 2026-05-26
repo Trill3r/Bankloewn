@@ -43,6 +43,10 @@ const drinks = [
   { name: "Moscow Mule", defaultVolumeMl: 300, alcoholPercent: 6.0, category: "Longdrink" },
   { name: "Wodka Lemon", defaultVolumeMl: 300, alcoholPercent: 6.0, category: "Longdrink" },
   { name: "Alcopop", defaultVolumeMl: 275, alcoholPercent: 5.0, category: "Longdrink" },
+  // Mische
+  { name: "Mische Schwach", defaultVolumeMl: 300, alcoholPercent: 6.0, category: "Mische" },
+  { name: "Mische Mittel",  defaultVolumeMl: 300, alcoholPercent: 8.0, category: "Mische" },
+  { name: "Mische Stark",   defaultVolumeMl: 300, alcoholPercent: 12.0, category: "Mische" },
   // Softdrink
   { name: "Wasser", defaultVolumeMl: 500, alcoholPercent: 0.0, category: "Softdrink" },
   { name: "Cola", defaultVolumeMl: 330, alcoholPercent: 0.0, category: "Softdrink" },

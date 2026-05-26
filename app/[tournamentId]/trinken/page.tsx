@@ -28,12 +28,19 @@ type VomitEntry = {
 };
 type FeedItem = ({ type: "drink" } & DrinkEntry) | ({ type: "vomit" } & VomitEntry);
 
-const CATEGORIES = ["Bier", "Wein", "Sekt", "Schnaps", "Longdrink", "Softdrink"];
+const CATEGORIES = ["Bier", "Mische", "Wein", "Sekt", "Schnaps", "Longdrink", "Softdrink"];
 
 const TRICHTER_SIZES = [
   { label: "Klein", ml: 330, emoji: "🍺" },
   { label: "Normal", ml: 500, emoji: "🍺🍺" },
   { label: "Doppelt", ml: 1000, emoji: "🍺🍺🍺" },
+];
+
+// Schlücke: Klein ~15ml (kleiner Schluck), Mittel ~25ml (normaler Schluck/EFSA ~20-30ml), Groß ~45ml (großer Schluck)
+const SCHLUCK_SIZES = [
+  { label: "Klein",  ml: 15,  desc: "≈15ml" },
+  { label: "Mittel", ml: 25,  desc: "≈25ml" },
+  { label: "Groß",   ml: 45,  desc: "≈45ml" },
 ];
 
 function formatDuration(seconds: number): string {
@@ -71,6 +78,8 @@ export default function TrinkenPage() {
   const [activeCategory, setActiveCategory] = useState("Bier");
   const [volume, setVolume] = useState("");
   const [alcoholPct, setAlcoholPct] = useState("");
+  const [schluckSize, setSchluckSize] = useState(25);
+  const [schluckCount, setSchluckCount] = useState(3);
   const [isTrichter, setIsTrichter] = useState(false);
   const [trichterDuration, setTrichterDuration] = useState("");
   const [timekeeperId, setTimekeeperId] = useState<string | null>(null);
@@ -128,6 +137,8 @@ export default function TrinkenPage() {
     setTimekeeperId(null);
     setStopwatchRunning(false);
     setStopwatchSeconds(0);
+    setSchluckSize(25);
+    setSchluckCount(3);
     setWizardOpen(true);
   }
 
@@ -594,21 +605,83 @@ export default function TrinkenPage() {
 
                   {/* Regular volume (shown if NOT trichter) */}
                   {!isTrichter && (
-                    <div>
-                      <label className="text-sm text-white/60 mb-2 block">Menge (ml)</label>
-                      <div className="flex gap-2 flex-wrap">
-                        {[100, 200, 250, 300, 330, 400, 500, 750].map((ml) => (
-                          <button key={ml} onClick={() => setVolume(String(ml))}
-                            className={cn("px-3 py-2 rounded-xl text-sm font-bold transition-colors",
-                              volume === String(ml) ? "bg-yellow-400 text-[#0D1B2A]" : "bg-[#0D1B2A] border border-white/10 text-white/70")}>
-                            {ml}ml
-                          </button>
-                        ))}
+                    <div className="space-y-4">
+                      {/* ml quick-pick */}
+                      <div>
+                        <label className="text-sm text-white/60 mb-2 block">Menge (ml)</label>
+                        <div className="flex gap-2 flex-wrap">
+                          {[100, 200, 250, 300, 330, 400, 500, 750].map((ml) => (
+                            <button key={ml} onClick={() => setVolume(String(ml))}
+                              className={cn("px-3 py-2 rounded-xl text-sm font-bold transition-colors",
+                                volume === String(ml) ? "bg-yellow-400 text-[#0D1B2A]" : "bg-[#0D1B2A] border border-white/10 text-white/70")}>
+                              {ml}ml
+                            </button>
+                          ))}
+                        </div>
+                        <input type="number" inputMode="numeric"
+                          className="mt-2 w-full bg-[#0D1B2A] border border-white/20 rounded-xl p-3 text-white text-lg focus:border-yellow-400 focus:outline-none"
+                          placeholder="Oder eigene Menge eingeben"
+                          value={volume} onChange={(e) => setVolume(e.target.value)} />
                       </div>
-                      <input type="number" inputMode="numeric"
-                        className="mt-2 w-full bg-[#0D1B2A] border border-white/20 rounded-xl p-3 text-white text-lg focus:border-yellow-400 focus:outline-none"
-                        placeholder="Oder eigene Menge eingeben"
-                        value={volume} onChange={(e) => setVolume(e.target.value)} />
+
+                      {/* Divider */}
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-px bg-white/10" />
+                        <span className="text-white/30 text-xs font-semibold">ODER</span>
+                        <div className="flex-1 h-px bg-white/10" />
+                      </div>
+
+                      {/* Schlücke */}
+                      <div className="bg-[#0D1B2A] rounded-2xl p-4">
+                        <label className="text-sm text-white/60 mb-3 block font-semibold">
+                          Schlücke zählen
+                        </label>
+                        {/* Schluck-Größe */}
+                        <div className="grid grid-cols-3 gap-2 mb-4">
+                          {SCHLUCK_SIZES.map((s) => (
+                            <button key={s.ml} onClick={() => {
+                              setSchluckSize(s.ml);
+                              setVolume(String(schluckCount * s.ml));
+                            }}
+                              className={cn("py-3 rounded-xl text-center border-2 transition-all active:scale-95",
+                                schluckSize === s.ml
+                                  ? "bg-blue-600 border-blue-400 text-white"
+                                  : "bg-[#1A2F45] border-white/10 text-white/60")}>
+                              <div className="font-bold text-sm">{s.label}</div>
+                              <div className="text-xs opacity-70 mt-0.5">{s.desc}</div>
+                            </button>
+                          ))}
+                        </div>
+                        {/* Anzahl Schlücke */}
+                        <div className="flex items-center justify-between">
+                          <span className="text-white/50 text-sm">Anzahl Schlücke</span>
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => {
+                                const n = Math.max(1, schluckCount - 1);
+                                setSchluckCount(n);
+                                setVolume(String(n * schluckSize));
+                              }}
+                              className="w-10 h-10 bg-[#1A2F45] rounded-xl flex items-center justify-center text-white text-xl font-bold active:scale-90 transition-transform">
+                              −
+                            </button>
+                            <span className="text-white font-black text-2xl w-8 text-center">{schluckCount}</span>
+                            <button
+                              onClick={() => {
+                                const n = schluckCount + 1;
+                                setSchluckCount(n);
+                                setVolume(String(n * schluckSize));
+                              }}
+                              className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white text-xl font-bold active:scale-90 transition-transform">
+                              +
+                            </button>
+                          </div>
+                        </div>
+                        {/* Live preview */}
+                        <div className="mt-3 text-center text-xs text-blue-400/80">
+                          {schluckCount} × {schluckSize}ml = <span className="font-black text-blue-300 text-sm">{schluckCount * schluckSize}ml</span>
+                        </div>
+                      </div>
                     </div>
                   )}
 
