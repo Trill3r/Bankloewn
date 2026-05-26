@@ -370,12 +370,15 @@ export default function AuswertungPage() {
 
         {/* ─── TRICHTER ─── */}
         {activeTab === "trichter" && (() => {
+          // allTrichter = unfiltered, used only for the Pro-Tag comparison table
           const allTrichter = drinkEntries.filter((e) => e.isTrichter);
-          const timedT = allTrichter.filter((e) => (e.durationSeconds ?? 0) > 0);
+          // ft = respects the day filter at the top
+          const ft = filteredDrinks.filter((e) => e.isTrichter);
+          const timedT = ft.filter((e) => (e.durationSeconds ?? 0) > 0);
 
-          // Per-player
+          // Per-player (day-filtered)
           const byPlayer = profiles.map((p) => {
-            const pt = allTrichter.filter((e) => e.profileId === p.id);
+            const pt = ft.filter((e) => e.profileId === p.id);
             const timed = pt.filter((e) => (e.durationSeconds ?? 0) > 0);
             const times = timed.map((e) => e.durationSeconds!);
             const avgTime = times.length ? times.reduce((a, b) => a + b, 0) / times.length : null;
@@ -389,26 +392,26 @@ export default function AuswertungPage() {
             return { profile: p, count: pt.length, timed: timed.length, avgTime, bestTime, worstTime, klein, normal, gross, perDay };
           }).filter((r) => r.count > 0).sort((a, b) => b.count - a.count);
 
-          // Team totals
+          // Team totals (day-filtered)
           const teamAvgTime = timedT.length ? timedT.reduce((s, e) => s + (e.durationSeconds ?? 0), 0) / timedT.length : null;
           const teamBest = timedT.length ? Math.min(...timedT.map((e) => e.durationSeconds!)) : null;
 
-          // Hourly
+          // Hourly (day-filtered)
           const hourly = Array.from({ length: 24 }, (_, h) => ({
             hour: `${h}h`,
-            count: allTrichter.filter((e) => new Date(e.consumedAt).getHours() === h).length,
+            count: ft.filter((e) => new Date(e.consumedAt).getHours() === h).length,
           }));
           const peakHour = hourly.reduce((m, h) => h.count > m.count ? h : m, hourly[0]);
 
-          // Sizes
-          const kleinTotal  = allTrichter.filter((e) => e.volumeMl <= 330).length;
-          const normalTotal = allTrichter.filter((e) => e.volumeMl > 330 && e.volumeMl <= 500).length;
-          const grossTotal  = allTrichter.filter((e) => e.volumeMl > 500).length;
+          // Sizes (day-filtered)
+          const kleinTotal  = ft.filter((e) => e.volumeMl <= 330).length;
+          const normalTotal = ft.filter((e) => e.volumeMl > 330 && e.volumeMl <= 500).length;
+          const grossTotal  = ft.filter((e) => e.volumeMl > 500).length;
           const sizeMax = Math.max(kleinTotal, normalTotal, grossTotal, 1);
 
-          // Timekeeper ranking
+          // Timekeeper ranking (day-filtered)
           const tkCounts: Record<string, number> = {};
-          allTrichter.forEach((e) => { if (e.timekeeperId) tkCounts[e.timekeeperId] = (tkCounts[e.timekeeperId] || 0) + 1; });
+          ft.forEach((e) => { if (e.timekeeperId) tkCounts[e.timekeeperId] = (tkCounts[e.timekeeperId] || 0) + 1; });
           const tkRanking = Object.entries(tkCounts)
             .map(([id, c]) => ({ profile: profiles.find((p) => p.id === id), count: c }))
             .filter((r) => r.profile).sort((a, b) => b.count - a.count);
@@ -431,7 +434,7 @@ export default function AuswertungPage() {
                 <h2 className="font-bold text-lg mb-3">🍺 Team Gesamt</h2>
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { label: "Trichter", value: `${allTrichter.length}×`, color: "text-yellow-400" },
+                    { label: "Trichter", value: `${ft.length}×`, color: "text-yellow-400" },
                     { label: "Ø Zeit", value: teamAvgTime ? formatDur(Math.round(teamAvgTime)) : "–", color: "text-green-400" },
                     { label: "Rekord", value: teamBest ? formatDur(teamBest) : "–", color: "text-blue-400" },
                   ].map((s) => (
@@ -587,7 +590,7 @@ export default function AuswertungPage() {
                     {[
                       { label: "Rekord", value: teamBest ? formatDur(teamBest) : "–", color: "text-yellow-400" },
                       { label: "Ø Team", value: teamAvgTime ? formatDur(Math.round(teamAvgTime)) : "–", color: "text-green-400" },
-                      { label: "Gemessen", value: `${timedT.length}/${allTrichter.length}`, color: "text-blue-400" },
+                      { label: "Gemessen", value: `${timedT.length}/${ft.length}`, color: "text-blue-400" },
                     ].map((s) => (
                       <div key={s.label} className="bg-[#0D1B2A] rounded-xl p-3 text-center">
                         <div className={`font-black text-lg ${s.color}`}>{s.value}</div>

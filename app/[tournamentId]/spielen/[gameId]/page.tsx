@@ -300,35 +300,35 @@ export default function GamePage() {
         )}
 
         {/* Score Board */}
-        <div className="card">
-          <div className="flex items-center justify-around gap-4">
+        <div className="card px-3">
+          <div className="flex items-center justify-around gap-2">
             {/* Us */}
             <div className="text-center flex-1">
               <p className="text-xs text-white/50 mb-2">Wir 🦁</p>
-              <div className="flex items-center justify-center gap-2">
+              <div className="flex items-center justify-center gap-1">
                 <button onClick={() => updateScore("us", -1)} disabled={isFinished}
-                  className="w-12 h-12 bg-[#0D1B2A] rounded-2xl flex items-center justify-center active:scale-90 transition-transform disabled:opacity-30 text-xl">
+                  className="w-11 h-11 bg-[#0D1B2A] rounded-2xl flex items-center justify-center active:scale-90 transition-transform disabled:opacity-30 flex-shrink-0">
                   <Minus className="w-5 h-5" />
                 </button>
-                <span className="text-5xl font-black text-yellow-400 w-14 text-center tabular-nums">{game.scoreUs}</span>
+                <span className="text-5xl font-black text-yellow-400 w-12 text-center tabular-nums">{game.scoreUs}</span>
                 <button onClick={() => updateScore("us", 1)} disabled={isFinished}
-                  className="w-12 h-12 bg-green-700 rounded-2xl flex items-center justify-center active:scale-90 transition-transform disabled:opacity-30 text-xl">
+                  className="w-11 h-11 bg-green-700 rounded-2xl flex items-center justify-center active:scale-90 transition-transform disabled:opacity-30 flex-shrink-0">
                   <Plus className="w-5 h-5" />
                 </button>
               </div>
             </div>
-            <span className="text-3xl font-black text-white/20">:</span>
+            <span className="text-3xl font-black text-white/20 flex-shrink-0">:</span>
             {/* Them */}
             <div className="text-center flex-1">
               <p className="text-xs text-white/50 mb-2 truncate">{game.opponentName}</p>
-              <div className="flex items-center justify-center gap-2">
+              <div className="flex items-center justify-center gap-1">
                 <button onClick={() => updateScore("them", -1)} disabled={isFinished}
-                  className="w-12 h-12 bg-[#0D1B2A] rounded-2xl flex items-center justify-center active:scale-90 transition-transform disabled:opacity-30 text-xl">
+                  className="w-11 h-11 bg-[#0D1B2A] rounded-2xl flex items-center justify-center active:scale-90 transition-transform disabled:opacity-30 flex-shrink-0">
                   <Minus className="w-5 h-5" />
                 </button>
-                <span className="text-5xl font-black w-14 text-center tabular-nums">{game.scoreThem}</span>
+                <span className="text-5xl font-black w-12 text-center tabular-nums">{game.scoreThem}</span>
                 <button onClick={() => updateScore("them", 1)} disabled={isFinished}
-                  className="w-12 h-12 bg-green-700 rounded-2xl flex items-center justify-center active:scale-90 transition-transform disabled:opacity-30 text-xl">
+                  className="w-11 h-11 bg-green-700 rounded-2xl flex items-center justify-center active:scale-90 transition-transform disabled:opacity-30 flex-shrink-0">
                   <Plus className="w-5 h-5" />
                 </button>
               </div>
