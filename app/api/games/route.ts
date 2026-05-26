@@ -10,7 +10,9 @@ export async function GET(req: NextRequest) {
     where: { tournamentId },
     include: {
       lineups: { include: { profile: true } },
-      _count: { select: { stats: true } },
+      stats: { include: { profile: true }, orderBy: { recordedAt: "asc" } },
+      attendees: { include: { profile: true } },
+      timeouts: { orderBy: { recordedAt: "asc" } },
     },
     orderBy: { createdAt: "asc" },
   });

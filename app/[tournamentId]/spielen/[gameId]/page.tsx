@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Plus, Minus, UserPlus, Users, Lock, X } from "lucide-react";
@@ -45,7 +45,13 @@ export default function GamePage() {
 
   // Selected player for stat entry (bottom sheet)
   const [selectedPlayer, setSelectedPlayer] = useState<{ profileId: string; nickname: string; color: string } | null>(null);
-  const [recordingFor, setRecordingFor] = useState<string | null>(null); // profileId currently submitting
+  const [recordingFor, setRecordingFor] = useState<string | null>(null);
+
+  // Timeout overlay
+  type TimeoutType = "tactical" | "technical" | null;
+  const [activeTimeout, setActiveTimeout] = useState<TimeoutType>(null);
+  const [timeoutSecondsLeft, setTimeoutSecondsLeft] = useState(30);
+  const timeoutRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   async function fetchGame() {
     const r = await fetch(`/api/games/${gameId}`);
@@ -106,6 +112,35 @@ export default function GamePage() {
     });
     setGame((prev) => prev ? { ...prev, ...update } : prev);
     if (nextStatus === "finished") toast.success("Spiel abgeschlossen und gesperrt 🔒");
+  }
+
+  async function callTimeout(type: TimeoutType) {
+    if (!type || !game || game.status !== "active") return;
+    // Record in DB
+    fetch("/api/game-timeouts", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ gameId, type }),
+    });
+    // Start overlay countdown
+    setActiveTimeout(type);
+    setTimeoutSecondsLeft(30);
+    if (timeoutRef.current) clearInterval(timeoutRef.current);
+    timeoutRef.current = setInterval(() => {
+      setTimeoutSecondsLeft((s) => {
+        if (s <= 1) {
+          clearInterval(timeoutRef.current!);
+          setActiveTimeout(null);
+          return 30;
+        }
+        return s - 1;
+      });
+    }, 1000);
+  }
+
+  function dismissTimeout() {
+    if (timeoutRef.current) clearInterval(timeoutRef.current);
+    setActiveTimeout(null);
+    setTimeoutSecondsLeft(30);
   }
 
   async function recordStat(profileId: string, statType: string) {
@@ -202,6 +237,26 @@ export default function GamePage() {
         {isFinished && (
           <div className="bg-white/5 border border-white/10 rounded-2xl p-3 text-center text-sm text-white/50">
             🔒 Dieses Spiel ist abgeschlossen und kann nicht mehr bearbeitet werden.
+          </div>
+        )}
+
+        {/* Timeout Buttons */}
+        {game.status === "active" && (
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => callTimeout("tactical")}
+              className="py-4 rounded-2xl bg-blue-700/80 border border-blue-500/50 text-white font-bold text-sm flex flex-col items-center gap-1 active:scale-95 transition-transform"
+            >
+              <span className="text-2xl">🤲</span>
+              <span>Takt. Auszeit</span>
+            </button>
+            <button
+              onClick={() => callTimeout("technical")}
+              className="py-4 rounded-2xl bg-orange-700/80 border border-orange-500/50 text-white font-bold text-sm flex flex-col items-center gap-1 active:scale-95 transition-transform"
+            >
+              <span className="text-2xl">🍺</span>
+              <span>Tech. Auszeit</span>
+            </button>
           </div>
         )}
 
@@ -467,6 +522,52 @@ export default function GamePage() {
             </div>
             <button onClick={() => setShowAttendancePicker(false)} className="btn-primary mt-4">Fertig</button>
           </div>
+        </div>
+      )}
+
+      {/* ─── TIMEOUT FULLSCREEN OVERLAY ─── */}
+      {activeTimeout && (
+        <div
+          className={cn(
+            "fixed inset-0 z-[100] flex flex-col items-center justify-center gap-8 cursor-pointer select-none",
+            activeTimeout === "tactical" ? "bg-blue-950" : "bg-[#1a0a00]"
+          )}
+          onClick={dismissTimeout}
+        >
+          {activeTimeout === "tactical" ? (
+            <>
+              <div className="text-[120px] leading-none animate-bounce">🤲</div>
+              <div className="text-white font-black text-5xl tracking-widest text-center px-8">
+                VERSCHIEBEN
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-[120px] leading-none animate-bounce">🍺</div>
+              <div className="text-[#F5C518] font-black text-5xl tracking-widest text-center px-8">
+                TRICHTER
+              </div>
+            </>
+          )}
+          {/* Countdown ring */}
+          <div className="relative w-24 h-24">
+            <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="8" />
+              <circle
+                cx="50" cy="50" r="44" fill="none"
+                stroke={activeTimeout === "tactical" ? "#60a5fa" : "#F5C518"}
+                strokeWidth="8"
+                strokeLinecap="round"
+                strokeDasharray={`${2 * Math.PI * 44}`}
+                strokeDashoffset={`${2 * Math.PI * 44 * (1 - timeoutSecondsLeft / 30)}`}
+                style={{ transition: "stroke-dashoffset 1s linear" }}
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-white text-3xl font-black">{timeoutSecondsLeft}</span>
+            </div>
+          </div>
+          <p className="text-white/40 text-sm">Tippen zum Schließen</p>
         </div>
       )}
 

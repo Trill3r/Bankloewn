@@ -92,6 +92,16 @@ model Game {
   lineups      GameLineup[]
   stats        GameStat[]
   attendees    GameAttendee[]
+  timeouts     GameTimeout[]
+}
+
+model GameTimeout {
+  id          String   @id @default(cuid())
+  gameId      String
+  game        Game     @relation(fields: [gameId], references: [id])
+  type        String   // "tactical" | "technical"
+  recordedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
 }
 
 model GameAttendee {

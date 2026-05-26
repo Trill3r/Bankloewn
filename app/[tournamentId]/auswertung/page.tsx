@@ -18,7 +18,17 @@ type DrinkEntry = {
 };
 type VomitEntry = { id: string; profileId: string; profile: Profile; notes?: string; recordedAt: string };
 type GameStat = { id: string; profileId: string; profile: Profile; statType: string; gameId: string; recordedAt: string };
-type Game = { id: string; name: string; opponentName: string; scoreUs: number; scoreThem: number; status: string; createdAt: string };
+type GameLineup = { id: string; profileId: string; profile: Profile; position: string; leftAt: string | null };
+type GameAttendee = { id: string; profileId: string; profile: Profile };
+type GameTimeout = { id: string; type: string; recordedAt: string };
+type Game = {
+  id: string; name: string; opponentName: string; scoreUs: number; scoreThem: number;
+  status: string; createdAt: string; startedAt?: string; endedAt?: string;
+  lineups?: GameLineup[];
+  stats?: GameStat[];
+  attendees?: GameAttendee[];
+  timeouts?: GameTimeout[];
+};
 
 const TABS = [
   { key: "trinken",  label: "🍺 Trinken"  },
@@ -56,6 +66,7 @@ export default function AuswertungPage() {
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState<string>("all");
   const [timelineFilter, setTimelineFilter] = useState<string>("all");
+  const [expandedGameId, setExpandedGameId] = useState<string | null>(null);
 
   useEffect(() => {
     const safe = (p: Promise<Response>) => p.then((r) => r.ok ? r.json() : []).catch(() => []);
@@ -73,6 +84,19 @@ export default function AuswertungPage() {
       setGames(Array.isArray(g) ? g : []);
     }).finally(() => setLoading(false));
   }, [tournamentId]);
+
+  // Position stats across all games for a given profileId
+  function positionStats(profileId: string) {
+    const counts: Record<string, number> = {};
+    games.forEach((g) => {
+      (g.lineups ?? []).forEach((l) => {
+        if (l.profileId === profileId) {
+          counts[l.position] = (counts[l.position] ?? 0) + 1;
+        }
+      });
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  }
 
   // All unique days
   const allDays = useMemo(() => {
@@ -244,6 +268,29 @@ export default function AuswertungPage() {
               </div>
             )}
 
+            {/* Per-day trichter comparison (multi-day only) */}
+            {allDays.length > 1 && (
+              <div className="card">
+                <h2 className="font-bold mb-3">📅 Trichter pro Tag</h2>
+                <div className="space-y-2">
+                  {allDays.map((day) => {
+                    const count = drinkEntries.filter((e) => e.isTrichter && dayKey(e.consumedAt) === day).length;
+                    const max = Math.max(...allDays.map((d) => drinkEntries.filter((e) => e.isTrichter && dayKey(e.consumedAt) === d).length), 1);
+                    return (
+                      <div key={day} className="flex items-center gap-3">
+                        <span className="text-xs text-white/50 w-20 flex-shrink-0">{dayLabel(day + "T12:00:00")}</span>
+                        <div className="flex-1 h-6 bg-[#0D1B2A] rounded-full overflow-hidden">
+                          <div className="h-full rounded-full bg-yellow-400 transition-all"
+                            style={{ width: `${(count / max) * 100}%` }} />
+                        </div>
+                        <span className="text-yellow-400 font-bold text-sm w-6 text-right">{count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="card">
               <h2 className="font-bold text-lg mb-3">🍺 Trichter Ranking</h2>
               <div className="space-y-3">
@@ -323,37 +370,147 @@ export default function AuswertungPage() {
         {/* ─── SPIELEN ─── */}
         {activeTab === "spielen" && (
           <>
-            <div className="card">
-              <h2 className="font-bold text-lg mb-3">🏐 Spiele</h2>
+            {/* Full game breakdown */}
+            <div className="space-y-3">
               {games.length === 0 ? (
-                <p className="text-white/30 text-center py-6">Noch keine Spiele</p>
+                <div className="card text-center py-8 text-white/30">Noch keine Spiele</div>
               ) : (
-                <div className="space-y-2">
-                  {games.map((g) => {
-                    const gStats = gameStats.filter((s) => s.gameId === g.id);
-                    return (
-                      <div key={g.id} className="bg-[#0D1B2A] rounded-xl p-3">
-                        <div className="flex items-center justify-between">
-                          <div>
+                games.map((g) => {
+                  const isExpanded = expandedGameId === g.id;
+                  const gStats = g.stats ?? gameStats.filter((s) => s.gameId === g.id);
+                  const gTimeouts = g.timeouts ?? [];
+                  const won = g.scoreUs > g.scoreThem;
+                  const lost = g.scoreUs < g.scoreThem;
+
+                  // Per-player stats for this game
+                  const playerRows = profiles.map((p) => {
+                    const ps = gStats.filter((s) => s.profileId === p.id);
+                    const pts = ps.filter((s) => s.statType === "point").length;
+                    const err = ps.filter((s) => s.statType === "error").length;
+                    const tri = ps.filter((s) => s.statType === "trichter").length;
+                    const nos = ps.filter((s) => s.statType === "nosebleed").length;
+                    const score = pts - err + tri * 3 - nos * 3;
+                    return { profile: p, pts, err, tri, nos, score, total: ps.length };
+                  }).filter((r) => r.total > 0);
+
+                  return (
+                    <div key={g.id} className="card overflow-hidden">
+                      {/* Game header — tappable */}
+                      <button className="w-full text-left" onClick={() => setExpandedGameId(isExpanded ? null : g.id)}>
+                        <div className="flex items-center gap-3">
+                          <div className={cn("w-2 h-12 rounded-full flex-shrink-0",
+                            won ? "bg-green-500" : lost ? "bg-red-500" : "bg-white/20")} />
+                          <div className="flex-1">
                             <div className="font-bold">{g.name}</div>
                             <div className="text-xs text-white/50">vs. {g.opponentName}</div>
                           </div>
-                          <div className="text-right">
-                            <div className="text-xl font-black">
-                              <span className="text-yellow-400">{g.scoreUs}</span>
-                              <span className="text-white/30 mx-1">:</span>
+                          <div className="text-right mr-2">
+                            <div className="text-2xl font-black">
+                              <span className={won ? "text-yellow-400" : "text-white"}>{g.scoreUs}</span>
+                              <span className="text-white/20 mx-1">:</span>
                               <span>{g.scoreThem}</span>
                             </div>
-                            <div className="text-xs text-white/30">{gStats.length} Aktionen</div>
+                            <div className="text-xs text-white/30">
+                              {gStats.length} Aktionen · {gTimeouts.length} Auszeiten
+                            </div>
                           </div>
+                          <span className="text-white/30 text-lg">{isExpanded ? "▲" : "▼"}</span>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      </button>
+
+                      {/* Expanded detail */}
+                      {isExpanded && (
+                        <div className="mt-4 space-y-4 border-t border-white/10 pt-4">
+                          {/* Attendance */}
+                          {(g.attendees ?? []).length > 0 && (
+                            <div>
+                              <div className="text-xs text-white/40 font-semibold mb-2 uppercase tracking-wider">Anwesend</div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {(g.attendees ?? []).map((a) => (
+                                  <div key={a.id} className="flex items-center gap-1 bg-[#0D1B2A] px-2 py-1 rounded-lg">
+                                    <div className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold"
+                                      style={{ backgroundColor: a.profile.avatarColor + "33", color: a.profile.avatarColor }}>
+                                      {a.profile.nickname[0].toUpperCase()}
+                                    </div>
+                                    <span className="text-xs">{a.profile.nickname}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Per-player stats */}
+                          {playerRows.length > 0 && (
+                            <div>
+                              <div className="text-xs text-white/40 font-semibold mb-2 uppercase tracking-wider">Spieler-Stats</div>
+                              <div className="space-y-1">
+                                {playerRows.sort((a, b) => b.score - a.score).map((r) => (
+                                  <div key={r.profile.id} className="flex items-center gap-2 bg-[#0D1B2A] rounded-xl px-3 py-2">
+                                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                                      style={{ backgroundColor: r.profile.avatarColor + "33", color: r.profile.avatarColor }}>
+                                      {r.profile.nickname[0].toUpperCase()}
+                                    </div>
+                                    <span className="flex-1 text-sm font-medium truncate">{r.profile.nickname}</span>
+                                    <div className="flex items-center gap-2 text-xs">
+                                      {r.pts > 0 && <span className="text-green-400">✅{r.pts}</span>}
+                                      {r.tri > 0 && <span className="text-yellow-400">🍺{r.tri}</span>}
+                                      {r.err > 0 && <span className="text-red-400">❌{r.err}</span>}
+                                      {r.nos > 0 && <span className="text-red-300">🩸{r.nos}</span>}
+                                    </div>
+                                    <span className={cn("text-sm font-black min-w-[32px] text-right",
+                                      r.score > 0 ? "text-green-400" : r.score < 0 ? "text-red-400" : "text-white/30")}>
+                                      {r.score > 0 ? "+" : ""}{r.score}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Timeouts */}
+                          {gTimeouts.length > 0 && (
+                            <div>
+                              <div className="text-xs text-white/40 font-semibold mb-2 uppercase tracking-wider">Auszeiten</div>
+                              <div className="flex gap-3">
+                                <div className="bg-blue-900/30 border border-blue-500/30 rounded-xl px-3 py-2 text-center">
+                                  <div className="text-blue-400 font-black text-xl">{gTimeouts.filter((t) => t.type === "tactical").length}</div>
+                                  <div className="text-xs text-white/40">🤲 Taktisch</div>
+                                </div>
+                                <div className="bg-orange-900/30 border border-orange-500/30 rounded-xl px-3 py-2 text-center">
+                                  <div className="text-orange-400 font-black text-xl">{gTimeouts.filter((t) => t.type === "technical").length}</div>
+                                  <div className="text-xs text-white/40">🍺 Technisch</div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Lineup */}
+                          {(g.lineups ?? []).filter((l) => !l.leftAt).length > 0 && (
+                            <div>
+                              <div className="text-xs text-white/40 font-semibold mb-2 uppercase tracking-wider">Aufstellung (Ende)</div>
+                              <div className="grid grid-cols-2 gap-1">
+                                {(g.lineups ?? []).filter((l) => !l.leftAt).map((l) => (
+                                  <div key={l.id} className="flex items-center gap-2 bg-[#0D1B2A] rounded-lg px-2 py-1.5">
+                                    <span className="text-[10px] text-white/30 w-14 truncate">{l.position}</span>
+                                    <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+                                      style={{ backgroundColor: l.profile.avatarColor + "33", color: l.profile.avatarColor }}>
+                                      {l.profile.nickname[0].toUpperCase()}
+                                    </div>
+                                    <span className="text-xs truncate">{l.profile.nickname}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
 
+            {/* Player ranking across all games */}
             <div className="card">
               <h2 className="font-bold text-lg mb-3">📊 Spieler Rankings</h2>
               {profileStats.every((p) => p.points === 0 && p.errors === 0) ? (
@@ -363,8 +520,8 @@ export default function AuswertungPage() {
                   {[
                     { label: "✅ Punkte", key: "points" as const, color: "text-green-400" },
                     { label: "🍺 Trichter-Aktionen", key: "trichterActions" as const, color: "text-yellow-400" },
-                    { label: "❌ Fehler-Shame", key: "errors" as const, color: "text-red-400" },
-                    { label: "🩸 Nasenbluten-Shame", key: "nosebleeds" as const, color: "text-red-300" },
+                    { label: "❌ Fehler", key: "errors" as const, color: "text-red-400" },
+                    { label: "🩸 Nasenbluten", key: "nosebleeds" as const, color: "text-red-300" },
                   ].map(({ label, key, color }) => (
                     <div key={key}>
                       <h3 className="text-sm text-white/50 mb-2">{label}</h3>
@@ -385,6 +542,37 @@ export default function AuswertungPage() {
                 </div>
               )}
             </div>
+
+            {/* Position stats */}
+            {games.some((g) => (g.lineups ?? []).length > 0) && (
+              <div className="card">
+                <h2 className="font-bold text-lg mb-3">📍 Positionsstatistik</h2>
+                <div className="space-y-4">
+                  {profiles.map((p) => {
+                    const pos = positionStats(p.id);
+                    if (pos.length === 0) return null;
+                    return (
+                      <div key={p.id}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
+                            style={{ backgroundColor: p.avatarColor + "33", color: p.avatarColor }}>
+                            {p.nickname[0].toUpperCase()}
+                          </div>
+                          <span className="font-semibold text-sm">{p.nickname}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 pl-9">
+                          {pos.map(([position, count]) => (
+                            <span key={position} className="bg-[#0D1B2A] text-white/70 text-xs px-2 py-1 rounded-lg">
+                              {position} <span className="text-yellow-400 font-bold">{count}×</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }).filter(Boolean)}
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -635,6 +823,39 @@ export default function AuswertungPage() {
                   </div>
                 </div>
               )}
+
+              {/* Auszeit-Stats */}
+              {games.some((g) => (g.timeouts ?? []).length > 0) && (() => {
+                const allTimeouts = games.flatMap((g) => (g.timeouts ?? []).map((t) => ({ ...t, gameName: g.name, opponent: g.opponentName })));
+                const tactical = allTimeouts.filter((t) => t.type === "tactical").length;
+                const technical = allTimeouts.filter((t) => t.type === "technical").length;
+                return (
+                  <div className="card">
+                    <h2 className="font-bold text-lg mb-3">⏸️ Auszeit-Statistik</h2>
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div className="bg-blue-900/30 border border-blue-500/30 rounded-2xl p-4 text-center">
+                        <div className="text-3xl mb-1">🤲</div>
+                        <div className="text-blue-400 font-black text-2xl">{tactical}</div>
+                        <div className="text-xs text-white/40 mt-1">Taktische Auszeiten</div>
+                      </div>
+                      <div className="bg-orange-900/30 border border-orange-500/30 rounded-2xl p-4 text-center">
+                        <div className="text-3xl mb-1">🍺</div>
+                        <div className="text-orange-400 font-black text-2xl">{technical}</div>
+                        <div className="text-xs text-white/40 mt-1">Technische Auszeiten</div>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      {games.filter((g) => (g.timeouts ?? []).length > 0).map((g) => (
+                        <div key={g.id} className="flex items-center gap-3 bg-[#0D1B2A] rounded-xl px-3 py-2">
+                          <span className="flex-1 text-sm font-medium truncate">vs. {g.opponentName}</span>
+                          <span className="text-blue-400 text-xs font-bold">🤲 {(g.timeouts ?? []).filter((t) => t.type === "tactical").length}</span>
+                          <span className="text-orange-400 text-xs font-bold">🍺 {(g.timeouts ?? []).filter((t) => t.type === "technical").length}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Top Getränke */}
               {topDrinks.length > 0 && (

@@ -20,8 +20,12 @@ type GameStat = { id: string; profileId: string; statType: string; gameId: strin
 type Game = {
   id: string; name: string; opponentName: string;
   scoreUs: number; scoreThem: number; status: string; createdAt: string;
+  lineups?: GameLineup[];
+  timeouts?: GameTimeout[];
 };
 type GameAttendee = { profileId: string; gameId: string };
+type GameLineup = { id: string; profileId: string; position: string; leftAt: string | null; gameId: string };
+type GameTimeout = { id: string; type: string; recordedAt: string };
 
 const STAT_DEFS = [
   { type: "point",     emoji: "✅", label: "Punkte",    value:  1 },
@@ -110,6 +114,17 @@ export default function SpielrDetailPage() {
 
   const attendedGameIds = new Set(attendances.filter((a) => a.profileId === profileId).map((a) => a.gameId));
   const attendedGames = games.filter((g) => attendedGameIds.has(g.id));
+
+  // Position history across all games
+  const positionCounts: Record<string, number> = {};
+  games.forEach((g) => {
+    (g.lineups ?? []).forEach((l) => {
+      if (l.profileId === profileId) {
+        positionCounts[l.position] = (positionCounts[l.position] ?? 0) + 1;
+      }
+    });
+  });
+  const positionEntries = Object.entries(positionCounts).sort((a, b) => b[1] - a[1]);
   const bestTrichter = myTrichter.filter((e) => e.durationSeconds != null).sort((a, b) => (a.durationSeconds ?? 0) - (b.durationSeconds ?? 0));
 
   // Timeline merged
@@ -412,6 +427,30 @@ export default function SpielrDetailPage() {
                 </div>
               )}
             </div>
+
+            {/* Position history */}
+            {positionEntries.length > 0 && (
+              <div className="bg-[#1A2F45] rounded-2xl p-4">
+                <div className="text-[#F5C518] font-bold mb-3 flex items-center gap-2">
+                  📍 Gespielte Positionen
+                </div>
+                <div className="space-y-2">
+                  {positionEntries.map(([pos, count]) => {
+                    const max = positionEntries[0][1];
+                    return (
+                      <div key={pos} className="flex items-center gap-3">
+                        <span className="text-white/70 text-sm w-24 flex-shrink-0">{pos}</span>
+                        <div className="flex-1 h-5 bg-[#0D1B2A] rounded-full overflow-hidden">
+                          <div className="h-full rounded-full bg-[#F5C518]/70 transition-all"
+                            style={{ width: `${(count / max) * 100}%` }} />
+                        </div>
+                        <span className="text-[#F5C518] font-bold text-sm w-6 text-right">{count}×</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Per-stat breakdown across all games */}
             {myStats.length > 0 && (

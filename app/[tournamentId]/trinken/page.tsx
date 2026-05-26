@@ -62,6 +62,9 @@ export default function TrinkenPage() {
 
   const [wizardOpen, setWizardOpen] = useState(false);
   const [vomitOpen, setVomitOpen] = useState(false);
+  const [trichterOpen, setTrichterOpen] = useState(false);
+  const [trichterStep, setTrichterStep] = useState<"person" | "details">("person");
+  const [trichterQuickVolume, setTrichterQuickVolume] = useState("500");
   const [step, setStep] = useState<"person" | "drink" | "amount">("person");
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
   const [selectedDrink, setSelectedDrink] = useState<Drink | null>(null);
@@ -126,6 +129,47 @@ export default function TrinkenPage() {
     setStopwatchRunning(false);
     setStopwatchSeconds(0);
     setWizardOpen(true);
+  }
+
+  function openTrichterWizard() {
+    setTrichterStep("person");
+    setSelectedProfile(currentProfile);
+    setTrichterQuickVolume("500");
+    setTrichterDuration("");
+    setTimekeeperId(null);
+    setStopwatchRunning(false);
+    setStopwatchSeconds(0);
+    setTrichterOpen(true);
+  }
+
+  async function submitTrichterOnly() {
+    if (!selectedProfile) return;
+    // Auto-pick first Bier, then first available drink
+    const bierDrink = drinks.find((d) => d.category === "Bier") ?? drinks[0];
+    if (!bierDrink) { toast.error("Kein Getränk verfügbar"); return; }
+    setSubmitting(true);
+    try {
+      const durationSeconds = trichterDuration ? parseDuration(trichterDuration) : null;
+      await fetch("/api/drink-entries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profileId: selectedProfile.id,
+          drinkId: bierDrink.id,
+          volumeMl: parseInt(trichterQuickVolume),
+          alcoholPercent: bierDrink.alcoholPercent,
+          isTrichter: true,
+          durationSeconds,
+          timekeeperId: timekeeperId || null,
+          tournamentId,
+        }),
+      });
+      toast.success("🍺 Trichter eingetragen!");
+      setTrichterOpen(false);
+    } catch {
+      toast.error("Fehler beim Eintragen");
+    }
+    setSubmitting(false);
   }
 
   function selectDrink(drink: Drink) {
@@ -293,12 +337,126 @@ export default function TrinkenPage() {
         })}
       </div>
 
-      {/* FAB */}
-      <button onClick={openWizard}
-        className="fixed w-16 h-16 bg-yellow-400 text-[#0D1B2A] rounded-full shadow-2xl flex items-center justify-center active:scale-90 transition-transform z-30 right-4"
+      {/* FABs — Trichter above, Drink below */}
+      <div className="fixed right-4 z-30 flex flex-col items-end gap-3"
         style={{ bottom: "calc(80px + env(safe-area-inset-bottom) + 16px)" }}>
-        <Plus className="w-8 h-8" strokeWidth={3} />
-      </button>
+        {/* Trichter FAB */}
+        <button onClick={openTrichterWizard}
+          className="w-14 h-14 bg-[#1A2F45] border-2 border-yellow-400 text-yellow-400 rounded-full shadow-xl flex items-center justify-center active:scale-90 transition-transform text-2xl">
+          🍺
+        </button>
+        {/* Getränk FAB */}
+        <button onClick={openWizard}
+          className="w-16 h-16 bg-yellow-400 text-[#0D1B2A] rounded-full shadow-2xl flex items-center justify-center active:scale-90 transition-transform">
+          <Plus className="w-8 h-8" strokeWidth={3} />
+        </button>
+      </div>
+
+      {/* ─── TRICHTER QUICK WIZARD ─── */}
+      {trichterOpen && (
+        <div className="fixed inset-0 bg-black/80 flex items-end z-50" onClick={() => setTrichterOpen(false)}>
+          <div className="bg-[#1A2F45] w-full rounded-t-3xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+
+            {/* Person step */}
+            {trichterStep === "person" && (
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-bold">🍺 Wer trichtert?</h2>
+                  <button onClick={() => setTrichterOpen(false)} className="text-white/30 p-1"><Plus className="w-5 h-5 rotate-45" /></button>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  {profiles.map((p) => (
+                    <button key={p.id}
+                      onClick={() => { setSelectedProfile(p); setTrichterStep("details"); }}
+                      className={cn("flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all active:scale-95",
+                        selectedProfile?.id === p.id ? "border-yellow-400 bg-yellow-400/10" : "border-white/10 bg-[#0D1B2A]")}>
+                      <div className="w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold"
+                        style={{ backgroundColor: p.avatarColor + "33", color: p.avatarColor }}>
+                        {p.nickname[0].toUpperCase()}
+                      </div>
+                      <span className="text-sm font-medium text-center leading-tight">{p.nickname}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Details step */}
+            {trichterStep === "details" && selectedProfile && (
+              <div className="p-6">
+                <button onClick={() => setTrichterStep("person")} className="text-white/40 text-sm mb-4 flex items-center gap-1">
+                  ← {selectedProfile.nickname}
+                </button>
+                <h2 className="text-xl font-bold mb-5">🍺 Trichter Details</h2>
+                <div className="space-y-5">
+                  {/* Size */}
+                  <div>
+                    <label className="text-sm text-yellow-400/80 mb-2 block font-semibold">Größe</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {TRICHTER_SIZES.map((size) => (
+                        <button key={size.ml} onClick={() => setTrichterQuickVolume(String(size.ml))}
+                          className={cn("py-4 rounded-2xl text-center border-2 transition-all active:scale-95",
+                            trichterQuickVolume === String(size.ml)
+                              ? "bg-yellow-400 text-[#0D1B2A] border-yellow-400"
+                              : "bg-[#0D1B2A] border-white/10 text-white/70")}>
+                          <div className="text-2xl">{size.emoji}</div>
+                          <div className="font-bold text-sm mt-1">{size.label}</div>
+                          <div className="text-xs opacity-70">{size.ml}ml</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Stopwatch + manual time */}
+                  <div>
+                    <label className="text-sm text-yellow-400/80 mb-2 block font-semibold">Zeit (optional)</label>
+                    <div className="flex gap-2">
+                      <button onClick={toggleStopwatch}
+                        className={cn("flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2",
+                          stopwatchRunning ? "bg-red-600 text-white" : "bg-[#0D1B2A] border border-white/20 text-white/70")}>
+                        <Timer className="w-4 h-4" />
+                        {stopwatchRunning ? `⏱ ${formatDuration(stopwatchSeconds)}` : "Stoppuhr"}
+                      </button>
+                      <input
+                        className="w-24 bg-[#0D1B2A] border border-white/20 rounded-xl p-3 text-white text-lg text-center focus:border-yellow-400 focus:outline-none"
+                        placeholder="1:30"
+                        value={trichterDuration}
+                        onChange={(e) => setTrichterDuration(e.target.value)}
+                      />
+                    </div>
+                    {trichterDuration && (
+                      <p className="text-xs text-yellow-400/60 mt-1">= {parseDuration(trichterDuration)} Sek.</p>
+                    )}
+                  </div>
+
+                  {/* Timekeeper */}
+                  <div>
+                    <label className="text-sm text-yellow-400/80 mb-2 block font-semibold">Timekeeper (optional)</label>
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {profiles.filter((p) => p.id !== selectedProfile?.id).map((p) => (
+                        <button key={p.id} onClick={() => setTimekeeperId(timekeeperId === p.id ? null : p.id)}
+                          className={cn("flex flex-col items-center gap-1 p-2 rounded-xl border-2 flex-shrink-0 transition-all",
+                            timekeeperId === p.id ? "border-yellow-400 bg-yellow-400/10" : "border-white/10 bg-[#0D1B2A]")}>
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
+                            style={{ backgroundColor: p.avatarColor + "33", color: p.avatarColor }}>
+                            {p.nickname[0].toUpperCase()}
+                          </div>
+                          <span className="text-xs">{p.nickname}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button onClick={submitTrichterOnly} disabled={submitting}
+                    className="w-full py-5 bg-yellow-400 text-[#0D1B2A] font-black text-xl rounded-2xl active:scale-95 transition-transform disabled:opacity-50">
+                    {submitting ? "..." : "🍺 Trichter eintragen!"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Drink Wizard */}
       {wizardOpen && (
