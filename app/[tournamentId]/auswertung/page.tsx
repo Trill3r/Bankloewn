@@ -31,12 +31,13 @@ type Game = {
 };
 
 const TABS = [
-  { key: "trinken",  label: "🍺 Trinken"  },
-  { key: "spielen",  label: "🏐 Spielen"  },
-  { key: "gesamt",   label: "🏆 Gesamt"   },
-  { key: "rekorde",  label: "📊 Rekorde"  },
-  { key: "spieler",  label: "👤 Spieler"  },
-  { key: "timeline", label: "📅 Timeline" },
+  { key: "trinken",   label: "🍺 Trinken"   },
+  { key: "trichter",  label: "🏆 Trichter"  },
+  { key: "spielen",   label: "🏐 Spielen"   },
+  { key: "gesamt",    label: "🎖 Gesamt"    },
+  { key: "rekorde",   label: "📊 Rekorde"   },
+  { key: "spieler",   label: "👤 Spieler"   },
+  { key: "timeline",  label: "📅 Timeline"  },
 ];
 
 const STAT_DEFS = [
@@ -366,6 +367,321 @@ export default function AuswertungPage() {
             </div>
           </>
         )}
+
+        {/* ─── TRICHTER ─── */}
+        {activeTab === "trichter" && (() => {
+          const allTrichter = drinkEntries.filter((e) => e.isTrichter);
+          const timedT = allTrichter.filter((e) => (e.durationSeconds ?? 0) > 0);
+
+          // Per-player
+          const byPlayer = profiles.map((p) => {
+            const pt = allTrichter.filter((e) => e.profileId === p.id);
+            const timed = pt.filter((e) => (e.durationSeconds ?? 0) > 0);
+            const times = timed.map((e) => e.durationSeconds!);
+            const avgTime = times.length ? times.reduce((a, b) => a + b, 0) / times.length : null;
+            const bestTime = times.length ? Math.min(...times) : null;
+            const worstTime = times.length ? Math.max(...times) : null;
+            const klein  = pt.filter((e) => e.volumeMl <= 330).length;
+            const normal = pt.filter((e) => e.volumeMl > 330 && e.volumeMl <= 500).length;
+            const gross  = pt.filter((e) => e.volumeMl > 500).length;
+            const perDay: Record<string, number> = {};
+            allDays.forEach((d) => { perDay[d] = pt.filter((e) => dayKey(e.consumedAt) === d).length; });
+            return { profile: p, count: pt.length, timed: timed.length, avgTime, bestTime, worstTime, klein, normal, gross, perDay };
+          }).filter((r) => r.count > 0).sort((a, b) => b.count - a.count);
+
+          // Team totals
+          const teamAvgTime = timedT.length ? timedT.reduce((s, e) => s + (e.durationSeconds ?? 0), 0) / timedT.length : null;
+          const teamBest = timedT.length ? Math.min(...timedT.map((e) => e.durationSeconds!)) : null;
+
+          // Hourly
+          const hourly = Array.from({ length: 24 }, (_, h) => ({
+            hour: `${h}h`,
+            count: allTrichter.filter((e) => new Date(e.consumedAt).getHours() === h).length,
+          }));
+          const peakHour = hourly.reduce((m, h) => h.count > m.count ? h : m, hourly[0]);
+
+          // Sizes
+          const kleinTotal  = allTrichter.filter((e) => e.volumeMl <= 330).length;
+          const normalTotal = allTrichter.filter((e) => e.volumeMl > 330 && e.volumeMl <= 500).length;
+          const grossTotal  = allTrichter.filter((e) => e.volumeMl > 500).length;
+          const sizeMax = Math.max(kleinTotal, normalTotal, grossTotal, 1);
+
+          // Timekeeper ranking
+          const tkCounts: Record<string, number> = {};
+          allTrichter.forEach((e) => { if (e.timekeeperId) tkCounts[e.timekeeperId] = (tkCounts[e.timekeeperId] || 0) + 1; });
+          const tkRanking = Object.entries(tkCounts)
+            .map(([id, c]) => ({ profile: profiles.find((p) => p.id === id), count: c }))
+            .filter((r) => r.profile).sort((a, b) => b.count - a.count);
+
+          if (allTrichter.length === 0) {
+            return (
+              <div className="text-center py-16 text-white/30">
+                <p className="text-5xl mb-3">🍺</p>
+                <p>Noch keine Trichter eingetragen</p>
+              </div>
+            );
+          }
+
+          return (
+            <>
+              {DayFilter}
+
+              {/* Team-Übersicht */}
+              <div className="card">
+                <h2 className="font-bold text-lg mb-3">🍺 Team Gesamt</h2>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: "Trichter", value: `${allTrichter.length}×`, color: "text-yellow-400" },
+                    { label: "Ø Zeit", value: teamAvgTime ? formatDur(Math.round(teamAvgTime)) : "–", color: "text-green-400" },
+                    { label: "Rekord", value: teamBest ? formatDur(teamBest) : "–", color: "text-blue-400" },
+                  ].map((s) => (
+                    <div key={s.label} className="bg-[#0D1B2A] rounded-xl p-3 text-center">
+                      <div className={`text-xl font-black ${s.color}`}>{s.value}</div>
+                      <div className="text-xs text-white/40 mt-1">{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Gesamttabelle */}
+              <div className="card">
+                <h2 className="font-bold text-lg mb-3">📋 Gesamttabelle</h2>
+                <div className="overflow-x-auto -mx-2">
+                  <table className="w-full text-sm min-w-[480px] px-2">
+                    <thead>
+                      <tr className="text-white/30 text-xs border-b border-white/10">
+                        <th className="text-left py-2 px-2 font-semibold">Spieler</th>
+                        <th className="text-center py-2 px-2 font-semibold">Anz.</th>
+                        <th className="text-center py-2 px-2 font-semibold">Ø Zeit</th>
+                        <th className="text-center py-2 px-2 font-semibold">Best</th>
+                        <th className="text-center py-2 px-2 font-semibold">Worst</th>
+                        <th className="text-center py-2 px-1 font-semibold">🍺S</th>
+                        <th className="text-center py-2 px-1 font-semibold">🍺🍺N</th>
+                        <th className="text-center py-2 px-1 font-semibold">🍺🍺🍺D</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {byPlayer.map((r, i) => (
+                        <tr key={r.profile.id} className={i === 0 ? "bg-yellow-400/5" : ""}>
+                          <td className="py-2.5 px-2">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                                style={{ backgroundColor: r.profile.avatarColor + "33", color: r.profile.avatarColor }}>
+                                {r.profile.nickname[0].toUpperCase()}
+                              </div>
+                              <span className="font-medium truncate max-w-[80px]">{r.profile.nickname}</span>
+                            </div>
+                          </td>
+                          <td className="text-center py-2.5 px-2 font-black text-yellow-400 text-base">{r.count}</td>
+                          <td className="text-center py-2.5 px-2 text-green-400 font-mono">{r.avgTime ? formatDur(Math.round(r.avgTime)) : "–"}</td>
+                          <td className="text-center py-2.5 px-2 text-blue-400 font-mono">{r.bestTime ? formatDur(r.bestTime) : "–"}</td>
+                          <td className="text-center py-2.5 px-2 text-red-400/70 font-mono">{r.worstTime ? formatDur(r.worstTime) : "–"}</td>
+                          <td className="text-center py-2.5 px-1 text-white/50">{r.klein || "–"}</td>
+                          <td className="text-center py-2.5 px-1 text-white/50">{r.normal || "–"}</td>
+                          <td className="text-center py-2.5 px-1 text-white/50">{r.gross || "–"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-xs text-white/20 mt-2 text-right">S=Klein 330ml · N=Normal 500ml · D=Doppelt 1L</p>
+              </div>
+
+              {/* Pro Tag (multi-day) */}
+              {allDays.length > 1 && (
+                <div className="card">
+                  <h2 className="font-bold text-lg mb-3">📅 Pro Tag</h2>
+                  {/* Day totals bar */}
+                  <div className="space-y-2 mb-4">
+                    {allDays.map((day) => {
+                      const cnt = allTrichter.filter((e) => dayKey(e.consumedAt) === day).length;
+                      const max = Math.max(...allDays.map((d) => allTrichter.filter((e) => dayKey(e.consumedAt) === d).length), 1);
+                      return (
+                        <div key={day} className="flex items-center gap-3">
+                          <span className="text-xs text-white/50 w-20 flex-shrink-0 font-medium">{dayLabel(day + "T12:00:00")}</span>
+                          <div className="flex-1 h-7 bg-[#0D1B2A] rounded-full overflow-hidden">
+                            <div className="h-full rounded-full bg-yellow-400 flex items-center px-2 transition-all"
+                              style={{ width: `${(cnt / max) * 100}%` }}>
+                              {cnt > 0 && <span className="text-[#0D1B2A] text-xs font-black">{cnt}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {/* Per-player per-day grid */}
+                  <div className="overflow-x-auto -mx-2">
+                    <table className="w-full text-sm min-w-[320px]">
+                      <thead>
+                        <tr className="text-white/30 text-xs border-b border-white/10">
+                          <th className="text-left py-1 px-2">Spieler</th>
+                          {allDays.map((d) => (
+                            <th key={d} className="text-center py-1 px-2 font-semibold whitespace-nowrap">
+                              {dayLabel(d + "T12:00:00")}
+                            </th>
+                          ))}
+                          <th className="text-center py-1 px-2 font-semibold text-yellow-400">Ges.</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {byPlayer.map((r) => (
+                          <tr key={r.profile.id}>
+                            <td className="py-2 px-2">
+                              <div className="flex items-center gap-1.5">
+                                <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0"
+                                  style={{ backgroundColor: r.profile.avatarColor + "33", color: r.profile.avatarColor }}>
+                                  {r.profile.nickname[0].toUpperCase()}
+                                </div>
+                                <span className="truncate max-w-[70px] text-xs">{r.profile.nickname}</span>
+                              </div>
+                            </td>
+                            {allDays.map((d) => (
+                              <td key={d} className="text-center py-2 px-2">
+                                {r.perDay[d] ? (
+                                  <span className="text-yellow-400 font-bold">{r.perDay[d]}</span>
+                                ) : (
+                                  <span className="text-white/20">–</span>
+                                )}
+                              </td>
+                            ))}
+                            <td className="text-center py-2 px-2 font-black text-yellow-400">{r.count}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Nach Uhrzeit */}
+              <div className="card">
+                <h2 className="font-bold mb-1">⏰ Nach Uhrzeit</h2>
+                {peakHour.count > 0 && (
+                  <p className="text-xs text-white/40 mb-3">
+                    Peak: <span className="text-yellow-400 font-bold">{peakHour.hour}</span> — {peakHour.count} Trichter
+                  </p>
+                )}
+                <ResponsiveContainer width="100%" height={160}>
+                  <BarChart data={hourly.filter((_, i) => i >= 8)} margin={{ top: 4, right: 4, left: -30, bottom: 0 }}>
+                    <XAxis dataKey="hour" tick={{ fill: "#ffffff50", fontSize: 10 }} />
+                    <YAxis tick={{ fill: "#ffffff50", fontSize: 10 }} allowDecimals={false} />
+                    <Tooltip
+                      contentStyle={{ background: "#1A2F45", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8 }}
+                      labelStyle={{ color: "white" }}
+                      formatter={(v: number) => [`${v} Trichter`]}
+                    />
+                    <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                      {hourly.filter((_, i) => i >= 8).map((entry, i) => (
+                        <Cell key={i} fill={entry.hour === peakHour.hour ? "#F5C518" : "#F5C51850"} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Zeiten — Hall of Fame */}
+              {timedT.length > 0 && (
+                <div className="card">
+                  <h2 className="font-bold text-lg mb-1">⚡ Zeiten-Auswertung</h2>
+                  <div className="grid grid-cols-3 gap-2 mb-4">
+                    {[
+                      { label: "Rekord", value: teamBest ? formatDur(teamBest) : "–", color: "text-yellow-400" },
+                      { label: "Ø Team", value: teamAvgTime ? formatDur(Math.round(teamAvgTime)) : "–", color: "text-green-400" },
+                      { label: "Gemessen", value: `${timedT.length}/${allTrichter.length}`, color: "text-blue-400" },
+                    ].map((s) => (
+                      <div key={s.label} className="bg-[#0D1B2A] rounded-xl p-3 text-center">
+                        <div className={`font-black text-lg ${s.color}`}>{s.value}</div>
+                        <div className="text-xs text-white/30 mt-0.5">{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Per-player time ranking */}
+                  <div className="space-y-2">
+                    {byPlayer.filter((r) => r.avgTime !== null).sort((a, b) => (a.avgTime ?? 999) - (b.avgTime ?? 999)).map((r, i) => (
+                      <div key={r.profile.id} className="flex items-center gap-2 bg-[#0D1B2A] rounded-xl px-3 py-2.5">
+                        <span className="text-sm w-6 text-center">{["🥇", "🥈", "🥉"][i] ?? `${i + 1}.`}</span>
+                        <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                          style={{ backgroundColor: r.profile.avatarColor + "33", color: r.profile.avatarColor }}>
+                          {r.profile.nickname[0].toUpperCase()}
+                        </div>
+                        <span className="flex-1 font-medium text-sm">{r.profile.nickname}</span>
+                        <div className="text-right text-xs space-y-0.5">
+                          <div className="text-green-400 font-mono font-bold">Ø {formatDur(Math.round(r.avgTime!))}</div>
+                          <div className="text-white/30">
+                            Best <span className="text-blue-400">{formatDur(r.bestTime!)}</span>
+                            {" · "}Worst <span className="text-red-400/60">{formatDur(r.worstTime!)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Full list of timed trichters */}
+                  <details className="mt-4">
+                    <summary className="text-xs text-white/30 cursor-pointer py-1">Alle {timedT.length} gemessenen Trichter anzeigen ▼</summary>
+                    <div className="space-y-1 mt-2">
+                      {[...timedT].sort((a, b) => (a.durationSeconds ?? 999) - (b.durationSeconds ?? 999)).map((e, i) => {
+                        const p = profiles.find((pr) => pr.id === e.profileId);
+                        return (
+                          <div key={e.id} className="flex items-center gap-2 text-xs py-1.5 border-b border-white/5">
+                            <span className="text-white/20 w-5">{i + 1}.</span>
+                            <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold"
+                              style={{ backgroundColor: (p?.avatarColor ?? "#888") + "33", color: p?.avatarColor ?? "#888" }}>
+                              {p?.nickname[0].toUpperCase() ?? "?"}
+                            </div>
+                            <span className="flex-1 text-white/70">{p?.nickname}</span>
+                            <span className="text-white/30">{formatVolume(e.volumeMl)} · {dayLabel(e.consumedAt)}</span>
+                            <span className="text-yellow-400 font-bold font-mono ml-2">{formatDur(e.durationSeconds!)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </details>
+                </div>
+              )}
+
+              {/* Größen */}
+              <div className="card">
+                <h2 className="font-bold text-lg mb-3">📐 Größen-Verteilung</h2>
+                <div className="space-y-3">
+                  {[
+                    { label: "Klein 🍺 (330ml)", count: kleinTotal, color: "bg-blue-500" },
+                    { label: "Normal 🍺🍺 (500ml)", count: normalTotal, color: "bg-yellow-400" },
+                    { label: "Doppelt 🍺🍺🍺 (1L)", count: grossTotal, color: "bg-orange-500" },
+                  ].map((s) => (
+                    <div key={s.label} className="flex items-center gap-3">
+                      <span className="text-sm text-white/60 w-36 flex-shrink-0">{s.label}</span>
+                      <div className="flex-1 h-6 bg-[#0D1B2A] rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${s.color} transition-all`}
+                          style={{ width: `${(s.count / sizeMax) * 100}%` }} />
+                      </div>
+                      <span className="text-white font-bold text-sm w-6 text-right">{s.count}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Timekeeper */}
+              {tkRanking.length > 0 && (
+                <div className="card">
+                  <h2 className="font-bold text-lg mb-3">🎯 Häufigster Timekeeper</h2>
+                  <div className="space-y-2">
+                    {tkRanking.map((r, i) => (
+                      <div key={r.profile!.id} className="flex items-center gap-3">
+                        <span className="text-lg w-7">{["🥇", "🥈", "🥉"][i] ?? `${i + 1}.`}</span>
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
+                          style={{ backgroundColor: r.profile!.avatarColor + "33", color: r.profile!.avatarColor }}>
+                          {r.profile!.nickname[0].toUpperCase()}
+                        </div>
+                        <span className="flex-1 font-semibold">{r.profile!.nickname}</span>
+                        <span className="text-yellow-400 font-black">{r.count}×</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {/* ─── SPIELEN ─── */}
         {activeTab === "spielen" && (

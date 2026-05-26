@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, Plus, Minus, UserPlus, Users, Lock, X } from "lucide-react";
@@ -45,7 +45,11 @@ export default function GamePage() {
 
   // Selected player for stat entry (bottom sheet)
   const [selectedPlayer, setSelectedPlayer] = useState<{ profileId: string; nickname: string; color: string } | null>(null);
-  const [recordingFor, setRecordingFor] = useState<string | null>(null);
+  // Recording lock: prevents double-taps; tracks which stat type is in-flight for the spinner
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingStatType, setRecordingStatType] = useState<string | null>(null);
+  // Score update lock (debounce rapid +/- taps)
+  const scoreUpdateRef = useRef(false);
 
   // Timeout overlay
   type TimeoutType = "tactical" | "technical" | null;
@@ -87,15 +91,24 @@ export default function GamePage() {
   }, [gameId]);
 
   async function updateScore(team: "us" | "them", delta: number) {
-    if (!game || game.status === "finished") return;
-    const update = team === "us"
-      ? { scoreUs: Math.max(0, game.scoreUs + delta) }
-      : { scoreThem: Math.max(0, game.scoreThem + delta) };
-    await fetch(`/api/games/${gameId}`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(update),
-    });
-    setGame((prev) => prev ? { ...prev, ...update } : prev);
+    if (!game || game.status === "finished" || scoreUpdateRef.current) return;
+    scoreUpdateRef.current = true;
+    const key = team === "us" ? "scoreUs" : "scoreThem";
+    const prev_val = game[key];
+    const newVal = Math.max(0, prev_val + delta);
+    // Optimistic — update UI immediately
+    setGame((prev) => prev ? { ...prev, [key]: newVal } : prev);
+    try {
+      await fetch(`/api/games/${gameId}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [key]: newVal }),
+      });
+    } catch {
+      // Rollback on error
+      setGame((prev) => prev ? { ...prev, [key]: prev_val } : prev);
+      toast.error("Fehler beim Speichern");
+    }
+    scoreUpdateRef.current = false;
   }
 
   async function toggleStatus() {
@@ -143,18 +156,44 @@ export default function GamePage() {
     setTimeoutSecondsLeft(30);
   }
 
-  async function recordStat(profileId: string, statType: string) {
-    if (!game || game.status === "finished") return;
-    setRecordingFor(profileId + statType);
-    await fetch("/api/game-stats", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ gameId, profileId, tournamentId, statType }),
-    });
-    setRecordingFor(null);
-    setSelectedPlayer(null);
+  const recordStat = useCallback(async (profileId: string, statType: string) => {
+    if (!game || game.status === "finished" || isRecording) return;
+
     const def = STAT_TYPES.find((s) => s.type === statType);
-    toast.success(`${def?.emoji} ${selectedPlayer?.nickname ?? ""} · ${def?.name}`);
-  }
+    const profileObj = allProfiles.find((p) => p.id === profileId) ??
+      { id: profileId, nickname: selectedPlayer?.nickname ?? "", avatarColor: selectedPlayer?.color ?? "#888" };
+
+    // Lock immediately + show which button is saving
+    setIsRecording(true);
+    setRecordingStatType(statType);
+
+    // Optimistic: add temp stat so score updates instantly
+    const tempId = `temp-${Date.now()}`;
+    const tempStat: GameStat = { id: tempId, profileId, profile: profileObj, statType, recordedAt: new Date().toISOString() };
+    setGame((prev) => prev ? { ...prev, stats: [tempStat, ...prev.stats] } : prev);
+
+    // Close sheet right away — no perceived lag
+    const playerName = selectedPlayer?.nickname ?? "";
+    setSelectedPlayer(null);
+
+    try {
+      const r = await fetch("/api/game-stats", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gameId, profileId, tournamentId, statType }),
+      });
+      const realStat: GameStat = await r.json();
+      // Swap temp with confirmed stat
+      setGame((prev) => prev ? { ...prev, stats: prev.stats.map((s) => s.id === tempId ? realStat : s) } : prev);
+      toast.success(`${def?.emoji} ${playerName} · ${def?.name}`);
+    } catch {
+      // Rollback temp stat
+      setGame((prev) => prev ? { ...prev, stats: prev.stats.filter((s) => s.id !== tempId) } : prev);
+      toast.error("Fehler beim Speichern ❌");
+    }
+
+    setIsRecording(false);
+    setRecordingStatType(null);
+  }, [game, isRecording, allProfiles, selectedPlayer, gameId, tournamentId]);
 
   async function toggleAttendee(profileId: string) {
     const isPresent = attendees.some((a) => a.profileId === profileId);
@@ -475,24 +514,37 @@ export default function GamePage() {
             {/* 2×2 action grid — big tap targets */}
             <div className="grid grid-cols-2 gap-3">
               {STAT_TYPES.map((stat) => {
-                const key = selectedPlayer.profileId + stat.type;
+                const isSavingThis = isRecording && recordingStatType === stat.type;
                 return (
                   <button
                     key={stat.type}
                     onClick={() => recordStat(selectedPlayer.profileId, stat.type)}
-                    disabled={recordingFor === key}
+                    disabled={isRecording}
                     className={cn(
-                      "py-5 rounded-2xl font-bold text-base flex flex-col items-center gap-1 active:scale-95 transition-all disabled:opacity-50",
+                      "py-5 rounded-2xl font-bold text-base flex flex-col items-center gap-1 transition-all",
+                      isRecording ? "opacity-50 scale-95" : "active:scale-95",
                       stat.color, stat.textColor
                     )}
                   >
-                    <span className="text-3xl">{stat.emoji}</span>
-                    <span>{stat.name}</span>
-                    <span className="text-xs opacity-60">{stat.value > 0 ? "+" : ""}{stat.value} Pkt</span>
+                    {isSavingThis ? (
+                      <>
+                        <span className="text-3xl animate-spin">⏳</span>
+                        <span>Speichern…</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-3xl">{stat.emoji}</span>
+                        <span>{stat.name}</span>
+                        <span className="text-xs opacity-60">{stat.value > 0 ? "+" : ""}{stat.value} Pkt</span>
+                      </>
+                    )}
                   </button>
                 );
               })}
             </div>
+            {isRecording && (
+              <p className="text-center text-xs text-white/30 mt-1">Wird gespeichert…</p>
+            )}
           </div>
         </div>
       )}
