@@ -36,10 +36,10 @@ type Game = {
 
 const POSITIONS = ["Zuspieler", "Diagonal", "Außen L", "Außen R", "Mitte L", "Mitte R", "Libero"];
 const STAT_TYPES = [
-  { type: "point", label: "✅ Punkt", color: "bg-green-600", value: 1 },
-  { type: "error", label: "❌ Fehler", color: "bg-red-700", value: -1 },
-  { type: "trichter", label: "🍺 Trichter", color: "bg-yellow-500", value: 3 },
-  { type: "nosebleed", label: "🩸 Nasenbluten", color: "bg-red-900", value: -3 },
+  { type: "point", label: "✅ Punkt", emoji: "✅", name: "Punkt", color: "bg-green-600 text-white", value: 1 },
+  { type: "error", label: "❌ Fehler", emoji: "❌", name: "Fehler", color: "bg-red-700 text-white", value: -1 },
+  { type: "trichter", label: "🍺 Trichter", emoji: "🍺", name: "Trichter", color: "bg-yellow-500 text-[#0D1B2A]", value: 3 },
+  { type: "nosebleed", label: "🩸 Nasenbluten", emoji: "🩸", name: "Nasenbluten", color: "bg-red-950 text-red-300 border border-red-800", value: -3 },
 ];
 
 export default function GamePage() {
@@ -228,48 +228,58 @@ export default function GamePage() {
             </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-2">
+          <div className="grid grid-cols-1 gap-3">
             {POSITIONS.map((pos) => {
               const slot = activeLineup.find((l) => l.position === pos);
+              const score = playerScores[slot?.profileId ?? ""] || 0;
               return (
                 <div key={pos} className={cn("card", !slot && "opacity-40 border-dashed")}>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-white/40 w-20 flex-shrink-0">{pos}</span>
+                  {/* Top row: player info */}
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-xs bg-white/10 text-white/50 px-2 py-1 rounded-lg w-20 text-center flex-shrink-0 truncate">
+                      {pos}
+                    </span>
                     {slot ? (
                       <>
                         <div
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                          className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-black flex-shrink-0"
                           style={{ backgroundColor: slot.profile.avatarColor + "33", color: slot.profile.avatarColor }}
                         >
                           {slot.profile.nickname[0].toUpperCase()}
                         </div>
-                        <span className="font-semibold flex-1">{slot.profile.nickname}</span>
+                        <span className="font-bold flex-1 truncate">{slot.profile.nickname}</span>
                         <span className={cn(
-                          "text-sm font-bold",
-                          (playerScores[slot.profileId] || 0) > 0 ? "text-green-400" :
-                          (playerScores[slot.profileId] || 0) < 0 ? "text-red-400" : "text-white/30"
+                          "text-lg font-black px-2 py-0.5 rounded-lg",
+                          score > 0 ? "text-green-400 bg-green-400/10" :
+                          score < 0 ? "text-red-400 bg-red-400/10" :
+                          "text-white/30"
                         )}>
-                          {(playerScores[slot.profileId] || 0) > 0 ? "+" : ""}{playerScores[slot.profileId] || 0}
+                          {score > 0 ? "+" : ""}{score}
                         </span>
-
-                        {/* Stat Buttons */}
-                        <div className="flex gap-1">
-                          {STAT_TYPES.map((stat) => (
-                            <button
-                              key={stat.type}
-                              onClick={() => recordStat(slot.profileId, stat.type)}
-                              className={cn("w-10 h-10 rounded-xl text-sm flex items-center justify-center active:scale-90 transition-transform", stat.color)}
-                              title={stat.label}
-                            >
-                              {stat.label.split(" ")[0]}
-                            </button>
-                          ))}
-                        </div>
                       </>
                     ) : (
-                      <span className="text-white/30 text-sm">Leer</span>
+                      <span className="text-white/30 text-sm">Noch kein Spieler</span>
                     )}
                   </div>
+
+                  {/* Bottom row: 2x2 stat buttons */}
+                  {slot && (
+                    <div className="grid grid-cols-2 gap-2">
+                      {STAT_TYPES.map((stat) => (
+                        <button
+                          key={stat.type}
+                          onClick={() => recordStat(slot.profileId, stat.type)}
+                          className={cn(
+                            "py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:scale-95 transition-transform",
+                            stat.color
+                          )}
+                        >
+                          <span className="text-xl">{stat.emoji}</span>
+                          <span>{stat.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -285,7 +295,7 @@ export default function GamePage() {
                 const statDef = STAT_TYPES.find((t) => t.type === s.statType);
                 return (
                   <div key={s.id} className="flex items-center gap-2 text-sm py-1">
-                    <span>{statDef?.label.split(" ")[0]}</span>
+                    <span>{statDef?.emoji}</span>
                     <span style={{ color: s.profile.avatarColor }}>{s.profile.nickname}</span>
                     <span className={cn(
                       "ml-auto font-bold",
