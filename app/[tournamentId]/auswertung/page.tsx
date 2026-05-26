@@ -14,17 +14,19 @@ type DrinkEntry = {
   volumeMl: number; alcoholPercent: number;
   consumedAt: string; isTrichter: boolean;
   durationSeconds?: number | null;
+  timekeeperId?: string | null;
 };
 type VomitEntry = { id: string; profileId: string; profile: Profile; notes?: string; recordedAt: string };
 type GameStat = { id: string; profileId: string; profile: Profile; statType: string; gameId: string; recordedAt: string };
 type Game = { id: string; name: string; opponentName: string; scoreUs: number; scoreThem: number; status: string; createdAt: string };
 
 const TABS = [
-  { key: "trinken", label: "🍺 Trinken" },
-  { key: "spielen", label: "🏐 Spielen" },
-  { key: "gesamt",  label: "🏆 Gesamt"  },
-  { key: "spieler", label: "👤 Spieler" },
-  { key: "timeline",label: "📅 Timeline"},
+  { key: "trinken",  label: "🍺 Trinken"  },
+  { key: "spielen",  label: "🏐 Spielen"  },
+  { key: "gesamt",   label: "🏆 Gesamt"   },
+  { key: "rekorde",  label: "📊 Rekorde"  },
+  { key: "spieler",  label: "👤 Spieler"  },
+  { key: "timeline", label: "📅 Timeline" },
 ];
 
 const STAT_DEFS = [
@@ -458,6 +460,233 @@ export default function AuswertungPage() {
             </div>
           </>
         )}
+
+        {/* ─── REKORDE ─── */}
+        {activeTab === "rekorde" && (() => {
+          // All trichter with times
+          const timedTrichter = drinkEntries.filter((e) => e.isTrichter && e.durationSeconds != null && e.durationSeconds > 0)
+            .sort((a, b) => (a.durationSeconds ?? 999) - (b.durationSeconds ?? 999));
+
+          // Per-player avg trichter time
+          const perPlayerTrichter = profiles.map((p) => {
+            const timed = timedTrichter.filter((e) => e.profileId === p.id);
+            const all = drinkEntries.filter((e) => e.isTrichter && e.profileId === p.id);
+            const avg = timed.length > 0 ? timed.reduce((s, e) => s + (e.durationSeconds ?? 0), 0) / timed.length : null;
+            const best = timed[0]?.durationSeconds ?? null;
+            return { profile: p, count: all.length, timedCount: timed.length, avg, best };
+          }).filter((p) => p.count > 0);
+
+          // Timekeeper stats
+          const tkCounts: Record<string, number> = {};
+          drinkEntries.forEach((e) => { if (e.timekeeperId) tkCounts[e.timekeeperId] = (tkCounts[e.timekeeperId] || 0) + 1; });
+          const timekeeperRanking = Object.entries(tkCounts)
+            .map(([id, count]) => ({ profile: profiles.find((p) => p.id === id), count }))
+            .filter((e) => e.profile)
+            .sort((a, b) => b.count - a.count);
+
+          // Team totals
+          const totalTrichter = drinkEntries.filter((e) => e.isTrichter).length;
+          const totalAlcohol = drinkEntries.reduce((s, e) => s + calcAlcoholGrams(e.volumeMl, e.alcoholPercent), 0);
+          const totalVolume = drinkEntries.reduce((s, e) => s + e.volumeMl, 0);
+          const totalVomits = vomitEntries.length;
+          const avgTrichterTime = timedTrichter.length > 0
+            ? timedTrichter.reduce((s, e) => s + (e.durationSeconds ?? 0), 0) / timedTrichter.length
+            : null;
+
+          // Most active day
+          const drinksByDay: Record<string, number> = {};
+          drinkEntries.forEach((e) => { const d = dayKey(e.consumedAt); drinksByDay[d] = (drinksByDay[d] || 0) + 1; });
+          const busiestDay = Object.entries(drinksByDay).sort((a, b) => b[1] - a[1])[0];
+
+          // Drink type breakdown
+          const drinkTypeCounts: Record<string, number> = {};
+          drinkEntries.forEach((e) => {
+            const name = e.isTrichter ? "Trichter 🍺" : e.drink.name;
+            drinkTypeCounts[name] = (drinkTypeCounts[name] || 0) + 1;
+          });
+          const topDrinks = Object.entries(drinkTypeCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+          return (
+            <>
+              {/* Team Zahlen */}
+              <div className="card">
+                <h2 className="font-bold text-lg mb-3">📊 Team Zahlen</h2>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { label: "Trichter gesamt", value: `${totalTrichter}×`, color: "text-yellow-400" },
+                    { label: "Alkohol gesamt", value: formatAlcohol(totalAlcohol), color: "text-orange-400" },
+                    { label: "Getränke gesamt", value: `${drinkEntries.length}×`, color: "text-blue-400" },
+                    { label: "Gesamtvolumen", value: formatVolume(totalVolume), color: "text-cyan-400" },
+                    { label: "Kotz-Events", value: `${totalVomits}×`, color: "text-purple-400" },
+                    {
+                      label: "Ø Trichter-Zeit",
+                      value: avgTrichterTime ? formatDur(Math.round(avgTrichterTime)) : "–",
+                      color: "text-green-400",
+                    },
+                  ].map((s) => (
+                    <div key={s.label} className="bg-[#0D1B2A] rounded-xl p-3 text-center">
+                      <div className={`text-2xl font-black ${s.color}`}>{s.value}</div>
+                      <div className="text-xs text-white/50 mt-1">{s.label}</div>
+                    </div>
+                  ))}
+                </div>
+                {busiestDay && (
+                  <div className="mt-3 bg-[#0D1B2A] rounded-xl p-3 text-center">
+                    <div className="text-white font-bold">
+                      Aktivster Tag: {dayLabel(busiestDay[0] + "T12:00:00")} · {busiestDay[1]} Getränke
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Trichter Hall of Fame */}
+              {timedTrichter.length > 0 && (
+                <div className="card">
+                  <h2 className="font-bold text-lg mb-3">⚡ Trichter Hall of Fame</h2>
+                  <div className="space-y-2">
+                    {timedTrichter.slice(0, 10).map((e, i) => {
+                      const p = profiles.find((pr) => pr.id === e.profileId);
+                      const medals = ["🥇", "🥈", "🥉"];
+                      return (
+                        <div key={e.id} className={`flex items-center gap-3 p-2 rounded-xl ${i === 0 ? "bg-yellow-400/10 border border-yellow-400/30" : ""}`}>
+                          <span className="text-lg w-8 text-center">{medals[i] || `${i + 1}.`}</span>
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                            style={{ backgroundColor: (p?.avatarColor ?? "#888") + "33", color: p?.avatarColor ?? "#888" }}>
+                            {p?.nickname[0].toUpperCase() ?? "?"}
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-semibold text-sm">{p?.nickname ?? "?"}</div>
+                            <div className="text-xs text-white/40">
+                              {formatVolume(e.volumeMl)} · {dayLabel(e.consumedAt)}
+                            </div>
+                          </div>
+                          <div className="text-yellow-400 font-black text-lg">{formatDur(e.durationSeconds!)}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Durchschnittszeiten */}
+              {perPlayerTrichter.some((p) => p.avg !== null) && (
+                <div className="card">
+                  <h2 className="font-bold text-lg mb-3">⏱️ Durchschnittszeiten</h2>
+                  <div className="space-y-3">
+                    {[...perPlayerTrichter]
+                      .filter((p) => p.avg !== null)
+                      .sort((a, b) => (a.avg ?? 999) - (b.avg ?? 999))
+                      .map((p, i) => (
+                        <div key={p.profile.id} className="flex items-center gap-3">
+                          <span className="text-white/30 text-sm w-5 text-center font-bold">{i + 1}</span>
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                            style={{ backgroundColor: p.profile.avatarColor + "33", color: p.profile.avatarColor }}>
+                            {p.profile.nickname[0].toUpperCase()}
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-semibold text-sm">{p.profile.nickname}</div>
+                            <div className="text-xs text-white/40">
+                              {p.timedCount} gemessen · Best: {p.best != null ? formatDur(p.best) : "–"}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-yellow-400 font-bold">{formatDur(Math.round(p.avg!))}</div>
+                            <div className="text-xs text-white/30">Ø</div>
+                          </div>
+                        </div>
+                      ))}
+                    {perPlayerTrichter.filter((p) => p.avg === null).map((p) => (
+                      <div key={p.profile.id} className="flex items-center gap-3 opacity-40">
+                        <span className="text-white/30 text-sm w-5 text-center">–</span>
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                          style={{ backgroundColor: p.profile.avatarColor + "33", color: p.profile.avatarColor }}>
+                          {p.profile.nickname[0].toUpperCase()}
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-semibold text-sm">{p.profile.nickname}</div>
+                          <div className="text-xs text-white/40">{p.count}× ohne Zeit</div>
+                        </div>
+                        <div className="text-white/30 text-sm">keine Zeit</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Häufigster Timekeeper */}
+              {timekeeperRanking.length > 0 && (
+                <div className="card">
+                  <h2 className="font-bold text-lg mb-3">🎯 Häufigster Timekeeper</h2>
+                  <div className="space-y-2">
+                    {timekeeperRanking.map((tk, i) => (
+                      <div key={tk.profile!.id} className="flex items-center gap-3">
+                        <span className="text-lg w-8 text-center">{["🥇", "🥈", "🥉"][i] || `${i + 1}.`}</span>
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
+                          style={{ backgroundColor: tk.profile!.avatarColor + "33", color: tk.profile!.avatarColor }}>
+                          {tk.profile!.nickname[0].toUpperCase()}
+                        </div>
+                        <span className="flex-1 font-semibold">{tk.profile!.nickname}</span>
+                        <div className="text-right">
+                          <div className="text-yellow-400 font-black">{tk.count}×</div>
+                          <div className="text-xs text-white/30">Timekeeper</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Top Getränke */}
+              {topDrinks.length > 0 && (
+                <div className="card">
+                  <h2 className="font-bold text-lg mb-3">🏅 Beliebteste Getränke</h2>
+                  <div className="space-y-2">
+                    {topDrinks.map(([name, count], i) => {
+                      const max = topDrinks[0][1];
+                      return (
+                        <div key={name} className="flex items-center gap-3">
+                          <span className="text-sm text-white/30 w-5 text-center">{i + 1}</span>
+                          <div className="flex-1">
+                            <div className="flex justify-between text-sm mb-1">
+                              <span className="text-white font-medium">{name}</span>
+                              <span className="text-yellow-400 font-bold">{count}×</span>
+                            </div>
+                            <div className="h-2 bg-[#0D1B2A] rounded-full overflow-hidden">
+                              <div className="h-full rounded-full bg-[#F5C518] transition-all" style={{ width: `${(count / max) * 100}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Per-Spieler Trichter-Ranking */}
+              {perPlayerTrichter.length > 0 && (
+                <div className="card">
+                  <h2 className="font-bold text-lg mb-3">🍺 Trichter-Anzahl Ranking</h2>
+                  <div className="space-y-2">
+                    {[...perPlayerTrichter].sort((a, b) => b.count - a.count).map((p, i) => (
+                      <div key={p.profile.id} className="flex items-center gap-3">
+                        <span className="text-lg w-8 text-center">{["🥇", "🥈", "🥉"][i] || `${i + 1}.`}</span>
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
+                          style={{ backgroundColor: p.profile.avatarColor + "33", color: p.profile.avatarColor }}>
+                          {p.profile.nickname[0].toUpperCase()}
+                        </div>
+                        <div className="flex-1">
+                          <div className="font-semibold">{p.profile.nickname}</div>
+                          {p.best != null && <div className="text-xs text-yellow-400/60">⚡ Best: {formatDur(p.best)}</div>}
+                        </div>
+                        <div className="text-yellow-400 font-black text-xl">{p.count}×</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {/* ─── SPIELER ─── */}
         {activeTab === "spieler" && (
