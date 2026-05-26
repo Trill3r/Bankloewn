@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Tournament {
+  id           String       @id @default(cuid())
+  name         String
+  date         DateTime
+  location     String
+  pinCode      String
+  status       String       @default("active")
+  createdAt    DateTime     @default(now())
+  profiles     Profile[]
+  drinkEntries DrinkEntry[]
+  vomitEntries VomitEntry[]
+  games        Game[]
+  gameStats    GameStat[]
+}
+
+model Profile {
+  id           String       @id @default(cuid())
+  nickname     String
+  avatarColor  String
+  tournamentId String
+  tournament   Tournament   @relation(fields: [tournamentId], references: [id])
+  createdAt    DateTime     @default(now())
+  drinkEntries DrinkEntry[]
+  vomitEntries VomitEntry[]
+  gameLineups  GameLineup[]
+  gameStats    GameStat[]
+}
+
+model Drink {
+  id              String       @id @default(cuid())
+  name            String
+  defaultVolumeMl Int
+  alcoholPercent  Float
+  category        String
+  isPreset        Boolean      @default(false)
+  tournamentId    String?
+  createdAt       DateTime     @default(now())
+  drinkEntries    DrinkEntry[]
+}
+
+model DrinkEntry {
+  id             String     @id @default(cuid())
+  profileId      String
+  profile        Profile    @relation(fields: [profileId], references: [id])
+  drinkId        String
+  drink          Drink      @relation(fields: [drinkId], references: [id])
+  volumeMl       Int
+  alcoholPercent Float
+  consumedAt     DateTime   @default(now())
+  isTrichter     Boolean    @default(false)
+  tournamentId   String
+  tournament     Tournament @relation(fields: [tournamentId], references: [id])
+  createdAt      DateTime   @default(now())
+}
+
+model VomitEntry {
+  id           String     @id @default(cuid())
+  profileId    String
+  profile      Profile    @relation(fields: [profileId], references: [id])
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id])
+  notes        String?
+  recordedAt   DateTime   @default(now())
+  createdAt    DateTime   @default(now())
+}
+
+model Game {
+  id           String       @id @default(cuid())
+  tournamentId String
+  tournament   Tournament   @relation(fields: [tournamentId], references: [id])
+  name         String
+  opponentName String
+  scoreUs      Int          @default(0)
+  scoreThem    Int          @default(0)
+  status       String       @default("planned")
+  startedAt    DateTime?
+  endedAt      DateTime?
+  createdAt    DateTime     @default(now())
+  lineups      GameLineup[]
+  stats        GameStat[]
+}
+
+model GameLineup {
+  id         String    @id @default(cuid())
+  gameId     String
+  game       Game      @relation(fields: [gameId], references: [id])
+  profileId  String
+  profile    Profile   @relation(fields: [profileId], references: [id])
+  position   String
+  isStarting Boolean   @default(true)
+  enteredAt  DateTime  @default(now())
+  leftAt     DateTime?
+}
+
+model GameStat {
+  id           String     @id @default(cuid())
+  gameId       String
+  game         Game       @relation(fields: [gameId], references: [id])
+  profileId    String
+  profile      Profile    @relation(fields: [profileId], references: [id])
+  tournamentId String
+  tournament   Tournament @relation(fields: [tournamentId], references: [id])
+  statType     String
+  recordedAt   DateTime   @default(now())
+  createdAt    DateTime   @default(now())
+}

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /Users/triller/Library/CloudStorage/OneDrive-Persönlich/Bankloewn remote -v)",
+      "Bash(git clone *)",
+      "Bash(git init *)",
+      "Bash(git remote *)",
+      "Bash(git fetch *)",
+      "Bash(git checkout *)",
+      "Bash(git branch *)",
+      "Bash(npx --yes create-next-app@14 . --typescript --tailwind --eslint --app --src-dir=false --import-alias=\"@/*\" --no-git)",
+      "Bash(npm install *)",
+      "Bash(mkdir -p app/api/tournaments/\\\\[id\\\\] app/api/profiles app/api/profiles/\\\\[id\\\\])"
+    ]
+  }
+}
