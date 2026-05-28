@@ -16,14 +16,27 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
-  const { gameId, profileId, tournamentId, statType } = body;
+  try {
+    const body = await req.json();
+    const { gameId, profileId, tournamentId, statType } = body;
 
-  const stat = await prisma.gameStat.create({
-    data: { gameId, profileId, tournamentId, statType },
-    include: { profile: true },
-  });
+    if (!gameId || !profileId || !tournamentId || !statType) {
+      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
 
-  await pusherServer.trigger(`game-${gameId}`, "new_game_stat", stat);
-  return NextResponse.json(stat, { status: 201 });
+    const stat = await prisma.gameStat.create({
+      data: { gameId, profileId, tournamentId, statType },
+      include: { profile: true },
+    });
+
+    // Pusher is fire-and-forget — don't let it block or crash the response
+    pusherServer.trigger(`game-${gameId}`, "new_game_stat", stat).catch((e) =>
+      console.error("Pusher trigger failed:", e)
+    );
+
+    return NextResponse.json(stat, { status: 201 });
+  } catch (e) {
+    console.error("game-stats POST error:", e);
+    return NextResponse.json({ error: "Interner Fehler" }, { status: 500 });
+  }
 }

@@ -99,11 +99,13 @@ export default function GamePage() {
     // Optimistic — update UI immediately
     setGame((prev) => prev ? { ...prev, [key]: newVal } : prev);
     try {
-      await fetch(`/api/games/${gameId}`, {
+      const r = await fetch(`/api/games/${gameId}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ [key]: newVal }),
       });
-    } catch {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    } catch (e) {
+      console.error("updateScore error:", e);
       // Rollback on error
       setGame((prev) => prev ? { ...prev, [key]: prev_val } : prev);
       toast.error("Fehler beim Speichern");
@@ -181,11 +183,13 @@ export default function GamePage() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ gameId, profileId, tournamentId, statType }),
       });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const realStat: GameStat = await r.json();
       // Swap temp with confirmed stat
       setGame((prev) => prev ? { ...prev, stats: prev.stats.map((s) => s.id === tempId ? realStat : s) } : prev);
       toast.success(`${def?.emoji} ${playerName} · ${def?.name}`);
-    } catch {
+    } catch (e) {
+      console.error("recordStat error:", e);
       // Rollback temp stat
       setGame((prev) => prev ? { ...prev, stats: prev.stats.filter((s) => s.id !== tempId) } : prev);
       toast.error("Fehler beim Speichern ❌");

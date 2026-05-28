@@ -15,13 +15,22 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const body = await req.json();
-  const game = await prisma.game.update({
-    where: { id: params.id },
-    data: body,
-    include: { lineups: { include: { profile: true } } },
-  });
+  try {
+    const body = await req.json();
+    const game = await prisma.game.update({
+      where: { id: params.id },
+      data: body,
+      include: { lineups: { include: { profile: true } } },
+    });
 
-  await pusherServer.trigger(`game-${params.id}`, "game_updated", game);
-  return NextResponse.json(game);
+    // Pusher is fire-and-forget — don't let it block or crash the response
+    pusherServer.trigger(`game-${params.id}`, "game_updated", game).catch((e) =>
+      console.error("Pusher trigger failed:", e)
+    );
+
+    return NextResponse.json(game);
+  } catch (e) {
+    console.error("games PATCH error:", e);
+    return NextResponse.json({ error: "Interner Fehler" }, { status: 500 });
+  }
 }
