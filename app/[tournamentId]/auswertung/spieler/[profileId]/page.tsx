@@ -289,7 +289,7 @@ export default function SpielrDetailPage() {
                   {
                     label: "Bester Trichter",
                     value: (bestTrichter[0]?.durationSeconds ?? 0) >= 100
-                      ? formatDur(bestTrichter[0].durationSeconds)
+                      ? formatDur(bestTrichter[0].durationSeconds!)
                       : "–",
                   },
                 ].map((s) => (
