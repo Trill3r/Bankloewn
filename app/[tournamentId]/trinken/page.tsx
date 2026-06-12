@@ -49,6 +49,13 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+function formatStopwatch(ms: number): string {
+  const m = Math.floor(ms / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  const cs = Math.floor((ms % 1000) / 10);
+  return `${m}:${s.toString().padStart(2, "0")}.${cs.toString().padStart(2, "0")}`;
+}
+
 function parseDuration(input: string): number {
   if (input.includes(":")) {
     const [m, s] = input.split(":").map(Number);
@@ -89,7 +96,7 @@ export default function TrinkenPage() {
 
   // Stopwatch state
   const [stopwatchRunning, setStopwatchRunning] = useState(false);
-  const [stopwatchSeconds, setStopwatchSeconds] = useState(0);
+  const [stopwatchMs, setStopwatchMs] = useState(0);
 
   useEffect(() => {
     const saved = localStorage.getItem(`profile_${tournamentId}`);
@@ -114,7 +121,7 @@ export default function TrinkenPage() {
   // Stopwatch timer
   useEffect(() => {
     if (!stopwatchRunning) return;
-    const interval = setInterval(() => setStopwatchSeconds((s) => s + 1), 1000);
+    const interval = setInterval(() => setStopwatchMs((s) => s + 10), 10);
     return () => clearInterval(interval);
   }, [stopwatchRunning]);
 
@@ -193,9 +200,9 @@ export default function TrinkenPage() {
   function toggleStopwatch() {
     if (stopwatchRunning) {
       setStopwatchRunning(false);
-      setTrichterDuration(formatDuration(stopwatchSeconds));
+      setTrichterDuration(formatDuration(Math.round(stopwatchMs / 1000)));
     } else {
-      setStopwatchSeconds(0);
+      setStopwatchMs(0);
       setStopwatchRunning(true);
       setTrichterDuration("");
     }
@@ -426,7 +433,7 @@ export default function TrinkenPage() {
                         className={cn("flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2",
                           stopwatchRunning ? "bg-red-600 text-white" : "bg-[#0D1B2A] border border-white/20 text-white/70")}>
                         <Timer className="w-4 h-4" />
-                        {stopwatchRunning ? `⏱ ${formatDuration(stopwatchSeconds)}` : "Stoppuhr"}
+                        {stopwatchRunning ? `⏱ ${formatStopwatch(stopwatchMs)}` : "Stoppuhr"}
                       </button>
                       <input
                         className="w-24 bg-[#0D1B2A] border border-white/20 rounded-xl p-3 text-white text-lg text-center focus:border-yellow-400 focus:outline-none"
@@ -567,7 +574,7 @@ export default function TrinkenPage() {
                             className={cn("flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all",
                               stopwatchRunning ? "bg-red-600 text-white" : "bg-[#0D1B2A] border border-white/20 text-white/70")}>
                             <Timer className="w-4 h-4" />
-                            {stopwatchRunning ? `⏱ ${formatDuration(stopwatchSeconds)}` : "Stoppuhr starten"}
+                            {stopwatchRunning ? `⏱ ${formatStopwatch(stopwatchMs)}` : "Stoppuhr starten"}
                           </button>
                           <input
                             className="w-28 bg-[#0D1B2A] border border-white/20 rounded-xl p-3 text-white text-lg text-center focus:border-yellow-400 focus:outline-none"
