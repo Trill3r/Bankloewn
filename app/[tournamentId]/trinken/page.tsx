@@ -268,6 +268,22 @@ export default function TrinkenPage() {
     toast.success("Gelöscht");
   }
 
+  async function fixAlcoholfreeEntries() {
+    const res = await fetch("/api/drink-entries", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "fix-alcoholfree-trichter", tournamentId }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      toast.success(`${data.fixed} Trichter auf ${data.drink} angepasst ✅`);
+      const updated = await fetch(`/api/drink-entries?tournamentId=${tournamentId}`).then((r) => r.json());
+      setDrinkEntries(Array.isArray(updated) ? updated : []);
+    } else {
+      toast.error(data.error ?? "Fehler beim Anpassen");
+    }
+  }
+
   const feed: FeedItem[] = [
     ...drinkEntries.map((e) => ({ ...e, type: "drink" as const })),
     ...vomitEntries.map((e) => ({ ...e, type: "vomit" as const })),
@@ -295,6 +311,15 @@ export default function TrinkenPage() {
       </div>
 
       <div className="max-w-md mx-auto px-4 py-3 space-y-2">
+        {drinkEntries.some((e) => e.isTrichter && e.alcoholPercent === 0) && (
+          <div className="bg-red-900/30 border border-red-500/40 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+            <p className="text-red-300 text-sm font-semibold">⚠️ Alkoholfreie Trichter gefunden</p>
+            <button onClick={fixAlcoholfreeEntries}
+              className="bg-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg active:scale-95 whitespace-nowrap">
+              Alle anpassen
+            </button>
+          </div>
+        )}
         {feed.length === 0 && (
           <div className="text-center py-16 text-white/30">
             <p className="text-4xl mb-3">🦁</p>

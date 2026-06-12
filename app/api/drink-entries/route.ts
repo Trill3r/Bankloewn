@@ -46,3 +46,27 @@ export async function DELETE(req: NextRequest) {
   await prisma.drinkEntry.delete({ where: { id } });
   return NextResponse.json({ success: true });
 }
+
+export async function PATCH(req: NextRequest) {
+  const body = await req.json();
+  const { action, tournamentId } = body;
+
+  if (action === "fix-alcoholfree-trichter") {
+    if (!tournamentId) return NextResponse.json({ error: "tournamentId required" }, { status: 400 });
+
+    const alcoholicBier = await prisma.drink.findFirst({
+      where: { alcoholPercent: { gt: 0 }, category: "Bier" },
+      orderBy: { isPreset: "desc" },
+    });
+    if (!alcoholicBier) return NextResponse.json({ error: "Kein alkoholisches Bier gefunden" }, { status: 404 });
+
+    const result = await prisma.drinkEntry.updateMany({
+      where: { tournamentId, isTrichter: true, alcoholPercent: 0 },
+      data: { drinkId: alcoholicBier.id, alcoholPercent: alcoholicBier.alcoholPercent },
+    });
+
+    return NextResponse.json({ fixed: result.count, drink: alcoholicBier.name });
+  }
+
+  return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+}
