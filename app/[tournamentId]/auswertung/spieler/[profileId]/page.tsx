@@ -327,7 +327,7 @@ export default function SpielrDetailPage() {
                           {(e.durationSeconds ?? 0) >= 100 && (
                             <div className="flex items-center gap-1 text-[#F5C518] font-bold">
                               <Clock size={14} />
-                              <span>{formatDur(e.durationSeconds)}</span>
+                              <span>{formatDur(e.durationSeconds!)}</span>
                             </div>
                           )}
                         </div>
