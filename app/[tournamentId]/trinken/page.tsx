@@ -162,9 +162,10 @@ export default function TrinkenPage() {
 
   async function submitTrichterOnly() {
     if (!selectedProfile) return;
-    // Auto-pick first Bier, then first available drink
-    const bierDrink = drinks.find((d) => d.category === "Bier") ?? drinks[0];
-    if (!bierDrink) { toast.error("Kein Getränk verfügbar"); return; }
+    // Auto-pick first non-alcoholfree Bier, then first non-alcoholfree drink
+    const bierDrink = drinks.find((d) => d.category === "Bier" && d.alcoholPercent > 0)
+      ?? drinks.find((d) => d.alcoholPercent > 0);
+    if (!bierDrink) { toast.error("Kein alkoholisches Getränk verfügbar"); return; }
     setSubmitting(true);
     try {
       const durationSeconds = trichterDuration ? parseDuration(trichterDuration) : null;
@@ -216,6 +217,10 @@ export default function TrinkenPage() {
 
   async function submitDrink() {
     if (!selectedProfile || !selectedDrink || !volume) return;
+    if (isTrichter && parseFloat(alcoholPct) === 0) {
+      toast.error("Trichter nicht mit alkoholfreien Getränken möglich! 🚫");
+      return;
+    }
     setSubmitting(true);
     try {
       const durationSeconds = trichterDuration ? parseDuration(trichterDuration) : null;
