@@ -143,7 +143,7 @@ export default function TrinkenPage() {
     setTrichterDuration("");
     setTimekeeperId(null);
     setStopwatchRunning(false);
-    setStopwatchSeconds(0);
+    setStopwatchMs(0);
     setSchluckSize(25);
     setSchluckCount(3);
     setWizardOpen(true);
@@ -156,7 +156,7 @@ export default function TrinkenPage() {
     setTrichterDuration("");
     setTimekeeperId(null);
     setStopwatchRunning(false);
-    setStopwatchSeconds(0);
+    setStopwatchMs(0);
     setTrichterOpen(true);
   }
 
@@ -206,6 +206,12 @@ export default function TrinkenPage() {
       setStopwatchRunning(true);
       setTrichterDuration("");
     }
+  }
+
+  function resetStopwatch() {
+    setStopwatchRunning(false);
+    setStopwatchMs(0);
+    setTrichterDuration("");
   }
 
   async function submitDrink() {
@@ -435,6 +441,12 @@ export default function TrinkenPage() {
                         <Timer className="w-4 h-4" />
                         {stopwatchRunning ? `⏱ ${formatStopwatch(stopwatchMs)}` : "Stoppuhr"}
                       </button>
+                      {(stopwatchRunning || stopwatchMs > 0) && (
+                        <button onClick={resetStopwatch}
+                          className="px-3 py-3 rounded-xl bg-[#0D1B2A] border border-white/20 text-white/50 text-lg font-bold active:scale-95">
+                          ×
+                        </button>
+                      )}
                       <input
                         className="w-24 bg-[#0D1B2A] border border-white/20 rounded-xl p-3 text-white text-lg text-center focus:border-yellow-400 focus:outline-none"
                         placeholder="1:30"
@@ -576,6 +588,12 @@ export default function TrinkenPage() {
                             <Timer className="w-4 h-4" />
                             {stopwatchRunning ? `⏱ ${formatStopwatch(stopwatchMs)}` : "Stoppuhr starten"}
                           </button>
+                          {(stopwatchRunning || stopwatchMs > 0) && (
+                            <button onClick={resetStopwatch}
+                              className="px-3 py-3 rounded-xl bg-[#0D1B2A] border border-white/20 text-white/50 text-lg font-bold active:scale-95">
+                              ×
+                            </button>
+                          )}
                           <input
                             className="w-28 bg-[#0D1B2A] border border-white/20 rounded-xl p-3 text-white text-lg text-center focus:border-yellow-400 focus:outline-none"
                             placeholder="1:30"

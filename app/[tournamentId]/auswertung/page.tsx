@@ -47,7 +47,7 @@ const STAT_DEFS = [
   { type: "nosebleed", emoji: "🩸", value: -3 },
 ];
 
-function formatDur(s: number) { return `${Math.floor(s/60)}:${(s%60).toString().padStart(2,"0")}`; }
+function formatDur(s: number) { return `${Math.floor(s/60)}:${(s%60).toString().padStart(2,"0")}.00`; }
 function dayKey(iso: string) { return iso.slice(0, 10); }
 function dayLabel(iso: string) {
   return new Date(iso).toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" });
