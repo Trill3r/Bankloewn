@@ -18,7 +18,7 @@ export function calcChampionScore(params: {
   vomitCount: number;
 }): number {
   const { gameScore, trichterCount, alcoholGrams, vomitCount } = params;
-  return gameScore + trichterCount * 3 + alcoholGrams / 10 + vomitCount * 2;
+  return gameScore + trichterCount * 2 + alcoholGrams / 10 + vomitCount * 2;
 }
 
 export function formatAlcohol(grams: number): string {
