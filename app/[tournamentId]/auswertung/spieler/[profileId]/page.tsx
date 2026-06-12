@@ -41,8 +41,11 @@ const TABS = [
   { key: "timeline",   label: "📅 Timeline"  },
 ];
 
-function formatDur(s: number) {
-  return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
+function formatDur(ms: number) {
+  const m = Math.floor(ms / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  const cs = Math.floor((ms % 1000) / 10);
+  return `${m}:${s.toString().padStart(2, "0")}.${cs.toString().padStart(2, "0")}`;
 }
 
 function dayLabel(iso: string) {

@@ -59,7 +59,7 @@ function formatStopwatch(ms: number): string {
 function parseDuration(input: string): number {
   if (input.includes(":")) {
     const [m, s] = input.split(":").map(Number);
-    return (m || 0) * 60 + (s || 0);
+    return ((m || 0) * 60 + (s || 0)) * 1000;
   }
   return parseInt(input) || 0;
 }
@@ -200,7 +200,7 @@ export default function TrinkenPage() {
   function toggleStopwatch() {
     if (stopwatchRunning) {
       setStopwatchRunning(false);
-      setTrichterDuration(formatDuration(Math.round(stopwatchMs / 1000)));
+      setTrichterDuration(String(stopwatchMs));
     } else {
       setStopwatchMs(0);
       setStopwatchRunning(true);
@@ -341,7 +341,7 @@ export default function TrinkenPage() {
                   {item.isTrichter && item.durationSeconds && (
                     <div className="text-xs text-yellow-400/80 flex items-center gap-1 mt-0.5">
                       <Timer className="w-3 h-3" />
-                      {formatDuration(item.durationSeconds)}
+                      {formatStopwatch(item.durationSeconds)}
                       {keeper && <span className="text-white/40 ml-1">· Timekeeper: {keeper.nickname}</span>}
                     </div>
                   )}
@@ -455,7 +455,7 @@ export default function TrinkenPage() {
                       />
                     </div>
                     {trichterDuration && (
-                      <p className="text-xs text-yellow-400/60 mt-1">= {parseDuration(trichterDuration)} Sek.</p>
+                      <p className="text-xs text-yellow-400/60 mt-1">= {(parseDuration(trichterDuration) / 1000).toFixed(2)} Sek.</p>
                     )}
                   </div>
 
@@ -603,7 +603,7 @@ export default function TrinkenPage() {
                         </div>
                         {trichterDuration && (
                           <p className="text-xs text-yellow-400/60 mt-1">
-                            = {parseDuration(trichterDuration)} Sekunden
+                            = {(parseDuration(trichterDuration) / 1000).toFixed(2)} Sekunden
                           </p>
                         )}
                       </div>

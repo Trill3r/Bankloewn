@@ -47,7 +47,12 @@ const STAT_DEFS = [
   { type: "nosebleed", emoji: "🩸", value: -3 },
 ];
 
-function formatDur(s: number) { return `${Math.floor(s/60)}:${(s%60).toString().padStart(2,"0")}.00`; }
+function formatDur(ms: number) {
+  const m = Math.floor(ms / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  const cs = Math.floor((ms % 1000) / 10);
+  return `${m}:${s.toString().padStart(2,"0")}.${cs.toString().padStart(2,"0")}`;
+}
 function dayKey(iso: string) { return iso.slice(0, 10); }
 function dayLabel(iso: string) {
   return new Date(iso).toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" });
@@ -435,7 +440,7 @@ export default function AuswertungPage() {
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { label: "Trichter", value: `${ft.length}×`, color: "text-yellow-400" },
-                    { label: "Ø Zeit", value: teamAvgTime ? formatDur(Math.round(teamAvgTime)) : "–", color: "text-green-400" },
+                    { label: "Ø Zeit", value: teamAvgTime ? formatDur(teamAvgTime) : "–", color: "text-green-400" },
                     { label: "Rekord", value: teamBest ? formatDur(teamBest) : "–", color: "text-blue-400" },
                   ].map((s) => (
                     <div key={s.label} className="bg-[#0D1B2A] rounded-xl p-3 text-center">
@@ -476,7 +481,7 @@ export default function AuswertungPage() {
                             </div>
                           </td>
                           <td className="text-center py-2.5 px-2 font-black text-yellow-400 text-base">{r.count}</td>
-                          <td className="text-center py-2.5 px-2 text-green-400 font-mono">{r.avgTime ? formatDur(Math.round(r.avgTime)) : "–"}</td>
+                          <td className="text-center py-2.5 px-2 text-green-400 font-mono">{r.avgTime ? formatDur(r.avgTime) : "–"}</td>
                           <td className="text-center py-2.5 px-2 text-blue-400 font-mono">{r.bestTime ? formatDur(r.bestTime) : "–"}</td>
                           <td className="text-center py-2.5 px-2 text-red-400/70 font-mono">{r.worstTime ? formatDur(r.worstTime) : "–"}</td>
                           <td className="text-center py-2.5 px-1 text-white/50">{r.klein || "–"}</td>
@@ -589,7 +594,7 @@ export default function AuswertungPage() {
                   <div className="grid grid-cols-3 gap-2 mb-4">
                     {[
                       { label: "Rekord", value: teamBest ? formatDur(teamBest) : "–", color: "text-yellow-400" },
-                      { label: "Ø Team", value: teamAvgTime ? formatDur(Math.round(teamAvgTime)) : "–", color: "text-green-400" },
+                      { label: "Ø Team", value: teamAvgTime ? formatDur(teamAvgTime) : "–", color: "text-green-400" },
                       { label: "Gemessen", value: `${timedT.length}/${ft.length}`, color: "text-blue-400" },
                     ].map((s) => (
                       <div key={s.label} className="bg-[#0D1B2A] rounded-xl p-3 text-center">
@@ -609,7 +614,7 @@ export default function AuswertungPage() {
                         </div>
                         <span className="flex-1 font-medium text-sm">{r.profile.nickname}</span>
                         <div className="text-right text-xs space-y-0.5">
-                          <div className="text-green-400 font-mono font-bold">Ø {formatDur(Math.round(r.avgTime!))}</div>
+                          <div className="text-green-400 font-mono font-bold">Ø {formatDur(r.avgTime!)}</div>
                           <div className="text-white/30">
                             Best <span className="text-blue-400">{formatDur(r.bestTime!)}</span>
                             {" · "}Worst <span className="text-red-400/60">{formatDur(r.worstTime!)}</span>
@@ -1027,7 +1032,7 @@ export default function AuswertungPage() {
                     { label: "Kotz-Events", value: `${totalVomits}×`, color: "text-purple-400" },
                     {
                       label: "Ø Trichter-Zeit",
-                      value: avgTrichterTime ? formatDur(Math.round(avgTrichterTime)) : "–",
+                      value: avgTrichterTime ? formatDur(avgTrichterTime) : "–",
                       color: "text-green-400",
                     },
                   ].map((s) => (
@@ -1097,7 +1102,7 @@ export default function AuswertungPage() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <div className="text-yellow-400 font-bold">{formatDur(Math.round(p.avg!))}</div>
+                            <div className="text-yellow-400 font-bold">{formatDur(p.avg!)}</div>
                             <div className="text-xs text-white/30">Ø</div>
                           </div>
                         </div>
