@@ -128,7 +128,7 @@ export default function SpielrDetailPage() {
     });
   });
   const positionEntries = Object.entries(positionCounts).sort((a, b) => b[1] - a[1]);
-  const bestTrichter = myTrichter.filter((e) => e.durationSeconds != null).sort((a, b) => (a.durationSeconds ?? 0) - (b.durationSeconds ?? 0));
+  const bestTrichter = myTrichter.filter((e) => (e.durationSeconds ?? 0) >= 100).sort((a, b) => (a.durationSeconds ?? 0) - (b.durationSeconds ?? 0));
 
   // Timeline merged
   type TimelineEvent =
@@ -288,7 +288,7 @@ export default function SpielrDetailPage() {
                   { label: "Trichter", value: `${myTrichter.length}×` },
                   {
                     label: "Bester Trichter",
-                    value: bestTrichter[0]?.durationSeconds != null
+                    value: (bestTrichter[0]?.durationSeconds ?? 0) >= 100
                       ? formatDur(bestTrichter[0].durationSeconds)
                       : "–",
                   },
@@ -324,7 +324,7 @@ export default function SpielrDetailPage() {
                               {timekeeper && ` · Zeitnehmer: ${timekeeper.nickname}`}
                             </div>
                           </div>
-                          {e.durationSeconds != null && (
+                          {(e.durationSeconds ?? 0) >= 100 && (
                             <div className="flex items-center gap-1 text-[#F5C518] font-bold">
                               <Clock size={14} />
                               <span>{formatDur(e.durationSeconds)}</span>
@@ -523,7 +523,7 @@ export default function SpielrDetailPage() {
                               <div className="text-gray-400 text-xs">
                                 {formatVolume((item.entry as DrinkEntry).volumeMl)} ·{" "}
                                 {formatAlcohol(calcAlcoholGrams((item.entry as DrinkEntry).volumeMl, (item.entry as DrinkEntry).alcoholPercent))}
-                                {(item.entry as DrinkEntry).durationSeconds != null &&
+                                {((item.entry as DrinkEntry).durationSeconds ?? 0) >= 100 &&
                                   ` · ⏱ ${formatDur((item.entry as DrinkEntry).durationSeconds!)}`}
                               </div>
                             </>

@@ -368,7 +368,7 @@ export default function TrinkenPage() {
                   <div className="text-white/80 text-sm">
                     {item.drink.name} · {item.volumeMl}ml · {item.alcoholPercent}%
                   </div>
-                  {item.isTrichter && item.durationSeconds && (
+                  {item.isTrichter && item.durationSeconds && item.durationSeconds >= 100 && (
                     <div className="text-xs text-yellow-400/80 flex items-center gap-1 mt-0.5">
                       <Timer className="w-3 h-3" />
                       {formatStopwatch(item.durationSeconds)}

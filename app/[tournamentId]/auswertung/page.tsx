@@ -379,12 +379,12 @@ export default function AuswertungPage() {
           const allTrichter = drinkEntries.filter((e) => e.isTrichter);
           // ft = respects the day filter at the top
           const ft = filteredDrinks.filter((e) => e.isTrichter);
-          const timedT = ft.filter((e) => (e.durationSeconds ?? 0) > 0);
+          const timedT = ft.filter((e) => (e.durationSeconds ?? 0) >= 100);
 
           // Per-player (day-filtered)
           const byPlayer = profiles.map((p) => {
             const pt = ft.filter((e) => e.profileId === p.id);
-            const timed = pt.filter((e) => (e.durationSeconds ?? 0) > 0);
+            const timed = pt.filter((e) => (e.durationSeconds ?? 0) >= 100);
             const times = timed.map((e) => e.durationSeconds!);
             const avgTime = times.length ? times.reduce((a, b) => a + b, 0) / times.length : null;
             const bestTime = times.length ? Math.min(...times) : null;
@@ -976,7 +976,7 @@ export default function AuswertungPage() {
         {/* ─── REKORDE ─── */}
         {activeTab === "rekorde" && (() => {
           // All trichter with times
-          const timedTrichter = drinkEntries.filter((e) => e.isTrichter && e.durationSeconds != null && e.durationSeconds > 0)
+          const timedTrichter = drinkEntries.filter((e) => e.isTrichter && e.durationSeconds != null && e.durationSeconds >= 100)
             .sort((a, b) => (a.durationSeconds ?? 999) - (b.durationSeconds ?? 999));
 
           // Per-player avg trichter time
