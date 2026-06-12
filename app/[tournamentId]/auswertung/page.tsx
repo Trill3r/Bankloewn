@@ -936,7 +936,7 @@ export default function AuswertungPage() {
                   </div>
                 )}
               </div>
-              <p className="text-xs text-white/30 text-center">Score = Spiel + Trichter×5 + Alkohol/10 − Kotzen×10</p>
+              <p className="text-xs text-white/30 text-center">Score = Spiel + Trichter×3 + Alkohol/10 + Kotzen×2</p>
             </div>
 
             <div className="card">
