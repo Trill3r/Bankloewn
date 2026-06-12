@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { profileId, drinkId, volumeMl, alcoholPercent, consumedAt, isTrichter, tournamentId } = body;
+  const { profileId, drinkId, volumeMl, alcoholPercent, consumedAt, isTrichter, tournamentId, durationSeconds, timekeeperId } = body;
 
   const entry = await prisma.drinkEntry.create({
     data: {
@@ -28,6 +28,8 @@ export async function POST(req: NextRequest) {
       consumedAt: consumedAt ? new Date(consumedAt) : new Date(),
       isTrichter: isTrichter ?? false,
       tournamentId,
+      durationSeconds: durationSeconds ?? null,
+      timekeeperId: timekeeperId ?? null,
     },
     include: { profile: true, drink: true },
   });
