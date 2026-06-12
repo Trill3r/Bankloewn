@@ -437,9 +437,9 @@ export default function TrinkenPage() {
                     <div className="flex gap-2">
                       <button onClick={toggleStopwatch}
                         className={cn("flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2",
-                          stopwatchRunning ? "bg-red-600 text-white" : "bg-[#0D1B2A] border border-white/20 text-white/70")}>
+                          stopwatchRunning ? "bg-red-600 text-white" : stopwatchMs > 0 ? "bg-green-700 text-white" : "bg-[#0D1B2A] border border-white/20 text-white/70")}>
                         <Timer className="w-4 h-4" />
-                        {stopwatchRunning ? `⏱ ${formatStopwatch(stopwatchMs)}` : "Stoppuhr"}
+                        {(stopwatchRunning || stopwatchMs > 0) ? `⏱ ${formatStopwatch(stopwatchMs)}` : "Stoppuhr"}
                       </button>
                       {(stopwatchRunning || stopwatchMs > 0) && (
                         <button onClick={resetStopwatch}
@@ -584,9 +584,9 @@ export default function TrinkenPage() {
                         <div className="flex gap-2">
                           <button onClick={toggleStopwatch}
                             className={cn("flex-1 py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all",
-                              stopwatchRunning ? "bg-red-600 text-white" : "bg-[#0D1B2A] border border-white/20 text-white/70")}>
+                              stopwatchRunning ? "bg-red-600 text-white" : stopwatchMs > 0 ? "bg-green-700 text-white" : "bg-[#0D1B2A] border border-white/20 text-white/70")}>
                             <Timer className="w-4 h-4" />
-                            {stopwatchRunning ? `⏱ ${formatStopwatch(stopwatchMs)}` : "Stoppuhr starten"}
+                            {(stopwatchRunning || stopwatchMs > 0) ? `⏱ ${formatStopwatch(stopwatchMs)}` : "Stoppuhr starten"}
                           </button>
                           {(stopwatchRunning || stopwatchMs > 0) && (
                             <button onClick={resetStopwatch}
