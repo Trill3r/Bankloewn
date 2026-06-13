@@ -186,7 +186,7 @@ export default function AuswertungPage() {
   const trichterByHour = Array.from({ length: 24 }, (_, h) => ({
     hour: `${h}h`,
     count: filteredDrinks.filter((e) => e.isTrichter && new Date(e.consumedAt).getHours() === h).length,
-  })).slice(8);
+  }));
 
   const championRanking = [...profileStats].sort((a, b) => b.championScore - a.championScore);
   const vomitRanking = [...profileStats].sort((a, b) => b.vomits - a.vomits);
