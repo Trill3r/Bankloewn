@@ -497,7 +497,9 @@ export default function SpielrDetailPage() {
               <div className="space-y-2">
                 {timeline.map((item, i) => {
                   const prev = timeline[i - 1];
-                  const showDay = !prev || item.ts.slice(0, 10) !== prev.ts.slice(0, 10);
+                  const d = new Date(item.ts); if (d.getHours() < 6) d.setDate(d.getDate() - 1);
+                  const dk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+                  const showDay = !prev || dk !== (() => { const p = new Date(prev.ts); if (p.getHours() < 6) p.setDate(p.getDate() - 1); return `${p.getFullYear()}-${String(p.getMonth()+1).padStart(2,"0")}-${String(p.getDate()).padStart(2,"0")}`; })();
                   return (
                     <div key={i}>
                       {showDay && (

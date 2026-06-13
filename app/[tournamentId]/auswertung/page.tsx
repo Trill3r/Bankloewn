@@ -53,7 +53,11 @@ function formatDur(ms: number) {
   const cs = Math.floor((ms % 1000) / 10);
   return `${m}:${s.toString().padStart(2,"0")}.${cs.toString().padStart(2,"0")}`;
 }
-function dayKey(iso: string) { return iso.slice(0, 10); }
+function dayKey(iso: string) {
+  const d = new Date(iso);
+  if (d.getHours() < 6) d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
 function dayLabel(iso: string) {
   return new Date(iso).toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" });
 }
