@@ -574,7 +574,7 @@ export default function AuswertungPage() {
                   </p>
                 )}
                 <ResponsiveContainer width="100%" height={160}>
-                  <BarChart data={hourly.filter((_, i) => i >= 8)} margin={{ top: 4, right: 4, left: -30, bottom: 0 }}>
+                  <BarChart data={hourly} margin={{ top: 4, right: 4, left: -30, bottom: 0 }}>
                     <XAxis dataKey="hour" tick={{ fill: "#ffffff50", fontSize: 10 }} />
                     <YAxis tick={{ fill: "#ffffff50", fontSize: 10 }} allowDecimals={false} />
                     <Tooltip
@@ -583,7 +583,7 @@ export default function AuswertungPage() {
                       formatter={(v: number) => [`${v} Trichter`]}
                     />
                     <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                      {hourly.filter((_, i) => i >= 8).map((entry, i) => (
+                      {hourly.map((entry, i) => (
                         <Cell key={i} fill={entry.hour === peakHour.hour ? "#F5C518" : "#F5C51850"} />
                       ))}
                     </Bar>
