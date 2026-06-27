@@ -32,6 +32,7 @@ type FeedItem = ({ type: "drink" } & DrinkEntry) | ({ type: "vomit" } & VomitEnt
 const CATEGORIES = ["Bier", "Mische", "Wein", "Sekt", "Schnaps", "Longdrink", "Softdrink"];
 
 const TRICHTER_SIZES = [
+  { label: "Halbe", ml: 250, emoji: "🍺" },
   { label: "Klein", ml: 330, emoji: "🍺" },
   { label: "Normal", ml: 500, emoji: "🍺🍺" },
   { label: "Doppelt", ml: 1000, emoji: "🍺🍺🍺" },
@@ -488,7 +489,7 @@ export default function TrinkenPage() {
                   <button onClick={() => setTrichterOpen(false)} className="text-white/30 p-1"><Plus className="w-5 h-5 rotate-45" /></button>
                 </div>
                 <button
-                  onClick={() => { setDoppelMode(!doppelMode); setSelectedProfiles([]); }}
+                  onClick={() => { setDoppelMode(!doppelMode); setSelectedProfiles([]); setTrichterQuickVolume(!doppelMode ? "250" : "500"); }}
                   className={cn("w-full mb-4 py-3 rounded-2xl border-2 font-bold text-sm transition-all active:scale-95",
                     doppelMode ? "bg-yellow-400/20 border-yellow-400 text-yellow-400" : "bg-[#0D1B2A] border-white/20 text-white/60")}>
                   🍺🍺 Doppeltrichter {doppelMode ? `(${selectedProfiles.length}/2 ausgewählt)` : ""}
@@ -521,7 +522,7 @@ export default function TrinkenPage() {
                   {/* Size */}
                   <div>
                     <label className="text-sm text-yellow-400/80 mb-2 block font-semibold">Größe</label>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-4 gap-2">
                       {TRICHTER_SIZES.map((size) => (
                         <button key={size.ml} onClick={() => setTrichterQuickVolume(String(size.ml))}
                           className={cn("py-4 rounded-2xl text-center border-2 transition-all active:scale-95",
@@ -668,7 +669,7 @@ export default function TrinkenPage() {
                     <div className="space-y-4 bg-yellow-400/5 border border-yellow-400/20 rounded-2xl p-4">
                       <div>
                         <label className="text-sm text-yellow-400/80 mb-2 block font-semibold">Trichter Größe</label>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-4 gap-2">
                           {TRICHTER_SIZES.map((size) => (
                             <button key={size.ml} onClick={() => setVolume(String(size.ml))}
                               className={cn("py-3 rounded-xl text-center transition-all active:scale-95 border-2",
