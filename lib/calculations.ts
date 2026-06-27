@@ -13,12 +13,13 @@ export function calcCombinedScore(params: {
 
 export function calcChampionScore(params: {
   gameScore: number;
-  trichterCount: number;
+  trichterVolumeMl: number;
   alcoholGrams: number;
   vomitCount: number;
 }): number {
-  const { gameScore, trichterCount, alcoholGrams, vomitCount } = params;
-  return gameScore + trichterCount * 2 + alcoholGrams / 10 + vomitCount * 2;
+  const { gameScore, trichterVolumeMl, alcoholGrams, vomitCount } = params;
+  const trichterPoints = trichterVolumeMl / 500;
+  return gameScore + trichterPoints * 2 + alcoholGrams / 10 + vomitCount * 2;
 }
 
 export function formatAlcohol(grams: number): string {

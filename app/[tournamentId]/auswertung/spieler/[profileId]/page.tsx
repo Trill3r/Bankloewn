@@ -108,12 +108,14 @@ export default function SpielrDetailPage() {
   const myStats = useMemo(() => gameStats.filter((s) => s.profileId === profileId), [gameStats, profileId]);
 
   const myTrichter = myDrinks.filter((e) => e.isTrichter);
+  const trichterVolumeMl = myTrichter.reduce((s, e) => s + e.volumeMl, 0);
+  const trichterPoints = trichterVolumeMl / 500;
   const alcoholGrams = myDrinks.reduce((s, e) => s + calcAlcoholGrams(e.volumeMl, e.alcoholPercent), 0);
   const gameScore = myStats.reduce((s, st) => {
     const def = STAT_DEFS.find((d) => d.type === st.statType);
     return s + (def?.value ?? 0);
   }, 0);
-  const championScore = calcChampionScore({ gameScore, trichterCount: myTrichter.length, alcoholGrams, vomitCount: myVomits.length });
+  const championScore = calcChampionScore({ gameScore, trichterVolumeMl, alcoholGrams, vomitCount: myVomits.length });
 
   const attendedGameIds = new Set(attendances.filter((a) => a.profileId === profileId).map((a) => a.gameId));
   const attendedGames = games.filter((g) => attendedGameIds.has(g.id));
@@ -237,9 +239,9 @@ export default function SpielrDetailPage() {
               <div className="space-y-2">
                 {[
                   { label: "Spielscore",    value: `+${gameScore > 0 ? gameScore : 0}`, sub: `${gameScore} Punkte` },
-                  { label: "Trichter-Bonus", value: `+${myTrichter.length * 5}`, sub: `${myTrichter.length} × 5` },
+                  { label: "Trichter-Bonus", value: `+${(trichterPoints * 2).toFixed(1)}`, sub: `${formatVolume(trichterVolumeMl)} ÷ 500ml × 2` },
                   { label: "Alkohol-Bonus",  value: `+${Math.round(alcoholGrams / 10)}`, sub: formatAlcohol(alcoholGrams) },
-                  { label: "Kotz-Abzug",    value: `-${myVomits.length * 10}`, sub: `${myVomits.length} × 10` },
+                  { label: "Kotz-Bonus",    value: `+${myVomits.length * 2}`, sub: `${myVomits.length} × 2` },
                 ].map((row) => (
                   <div key={row.label} className="flex justify-between items-center py-1 border-b border-white/5">
                     <div>
@@ -285,7 +287,7 @@ export default function SpielrDetailPage() {
                 {[
                   { label: "Gesamtvolumen", value: formatVolume(myDrinks.reduce((s, e) => s + e.volumeMl, 0)) },
                   { label: "Alkohol gesamt", value: formatAlcohol(alcoholGrams) },
-                  { label: "Trichter", value: `${myTrichter.length}×` },
+                  { label: "Trichter", value: `${myTrichter.length}× (${formatVolume(trichterVolumeMl)})` },
                   {
                     label: "Bester Trichter",
                     value: (bestTrichter[0]?.durationSeconds ?? 0) >= 100

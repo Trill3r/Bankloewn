@@ -124,6 +124,7 @@ export default function AuswertungPage() {
     const drinks = filteredDrinks.filter((e) => e.profileId === p.id);
     const vomits = filteredVomits.filter((e) => e.profileId === p.id);
     const trichter = drinks.filter((e) => e.isTrichter);
+    const trichterVolumeMl = trichter.reduce((s, e) => s + e.volumeMl, 0);
     const alcoholGrams = drinks.reduce((s, e) => s + calcAlcoholGrams(e.volumeMl, e.alcoholPercent), 0);
     const totalVolume = drinks.reduce((s, e) => s + e.volumeMl, 0);
     const gStats = gameStats.filter((s) => s.profileId === p.id);
@@ -132,8 +133,8 @@ export default function AuswertungPage() {
     const trichterActions = gStats.filter((s) => s.statType === "trichter").length;
     const nosebleeds = gStats.filter((s) => s.statType === "nosebleed").length;
     const gameScore = points - errors + trichterActions * 3 - nosebleeds * 3;
-    const championScore = calcChampionScore({ gameScore, trichterCount: trichter.length, alcoholGrams, vomitCount: vomits.length });
-    return { profile: p, drinks: drinks.length, trichter: trichter.length, alcoholGrams, totalVolume, vomits: vomits.length, gameScore, points, errors, trichterActions, nosebleeds, championScore };
+    const championScore = calcChampionScore({ gameScore, trichterVolumeMl, alcoholGrams, vomitCount: vomits.length });
+    return { profile: p, drinks: drinks.length, trichter: trichter.length, trichterVolumeMl, alcoholGrams, totalVolume, vomits: vomits.length, gameScore, points, errors, trichterActions, nosebleeds, championScore };
   });
 
   // Timeline: merge all events
@@ -323,7 +324,7 @@ export default function AuswertungPage() {
                       </div>
                       <div className="text-right">
                         <div className="text-xl font-black text-yellow-400">{ps.trichter}</div>
-                        <div className="text-xs text-white/40">Trichter</div>
+                        <div className="text-xs text-white/40">Trichter · {formatVolume(ps.trichterVolumeMl)}</div>
                       </div>
                     </div>
                   );
@@ -945,7 +946,7 @@ export default function AuswertungPage() {
                   </div>
                 )}
               </div>
-              <p className="text-xs text-white/30 text-center">Score = Spiel + Trichter×2 + Alkohol/10 + Kotzen×2</p>
+              <p className="text-xs text-white/30 text-center">Score = Spiel + (Trichter-Menge/500ml)×2 + Alkohol/10 + Kotzen×2</p>
             </div>
 
             <div className="card">
