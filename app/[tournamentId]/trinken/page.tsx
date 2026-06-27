@@ -19,6 +19,7 @@ type DrinkEntry = {
   isTrichter: boolean;
   durationSeconds?: number | null;
   timekeeperId?: string | null;
+  groupId?: string | null;
 };
 type VomitEntry = {
   id: string;
@@ -79,6 +80,8 @@ export default function TrinkenPage() {
   const [trichterOpen, setTrichterOpen] = useState(false);
   const [trichterStep, setTrichterStep] = useState<"person" | "details">("person");
   const [trichterQuickVolume, setTrichterQuickVolume] = useState("500");
+  const [doppelMode, setDoppelMode] = useState(false);
+  const [selectedProfiles, setSelectedProfiles] = useState<Profile[]>([]);
   const [step, setStep] = useState<"person" | "drink" | "amount">("person");
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
   const [selectedDrink, setSelectedDrink] = useState<Drink | null>(null);
@@ -152,6 +155,8 @@ export default function TrinkenPage() {
   function openTrichterWizard() {
     setTrichterStep("person");
     setSelectedProfile(currentProfile);
+    setSelectedProfiles([]);
+    setDoppelMode(false);
     setTrichterQuickVolume("500");
     setTrichterDuration("");
     setTimekeeperId(null);
@@ -160,8 +165,26 @@ export default function TrinkenPage() {
     setTrichterOpen(true);
   }
 
+  function selectTrichterPerson(p: Profile) {
+    if (doppelMode) toggleDoppelProfile(p);
+    else { setSelectedProfile(p); setTrichterStep("details"); }
+  }
+
+  function toggleDoppelProfile(p: Profile) {
+    setSelectedProfiles((prev) => {
+      const exists = prev.some((sp) => sp.id === p.id);
+      if (exists) return prev.filter((sp) => sp.id !== p.id);
+      if (prev.length >= 2) return prev;
+      const next = [...prev, p];
+      if (next.length === 2) setTrichterStep("details");
+      return next;
+    });
+  }
+
   async function submitTrichterOnly() {
-    if (!selectedProfile) return;
+    const activeProfiles = doppelMode ? selectedProfiles : selectedProfile ? [selectedProfile] : [];
+    if (activeProfiles.length === 0) return;
+    if (doppelMode && activeProfiles.length !== 2) return;
     // Auto-pick first non-alcoholfree Bier, then first non-alcoholfree drink
     const bierDrink = drinks.find((d) => d.category === "Bier" && d.alcoholPercent > 0)
       ?? drinks.find((d) => d.alcoholPercent > 0);
@@ -169,21 +192,25 @@ export default function TrinkenPage() {
     setSubmitting(true);
     try {
       const durationSeconds = trichterDuration ? parseDuration(trichterDuration) : null;
-      await fetch("/api/drink-entries", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          profileId: selectedProfile.id,
-          drinkId: bierDrink.id,
-          volumeMl: parseInt(trichterQuickVolume),
-          alcoholPercent: bierDrink.alcoholPercent,
-          isTrichter: true,
-          durationSeconds,
-          timekeeperId: timekeeperId || null,
-          tournamentId,
-        }),
-      });
-      toast.success("🍺 Trichter eingetragen!");
+      const groupId = doppelMode ? crypto.randomUUID() : null;
+      await Promise.all(activeProfiles.map((p) =>
+        fetch("/api/drink-entries", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            profileId: p.id,
+            drinkId: bierDrink.id,
+            volumeMl: parseInt(trichterQuickVolume),
+            alcoholPercent: bierDrink.alcoholPercent,
+            isTrichter: true,
+            durationSeconds,
+            timekeeperId: timekeeperId || null,
+            tournamentId,
+            groupId,
+          }),
+        })
+      ));
+      toast.success(doppelMode ? "🍺🍺 Doppeltrichter eingetragen!" : "🍺 Trichter eingetragen!");
       setTrichterOpen(false);
     } catch {
       toast.error("Fehler beim Eintragen");
@@ -268,6 +295,13 @@ export default function TrinkenPage() {
     toast.success("Gelöscht");
   }
 
+  async function deleteGroupEntry(groupId: string) {
+    const ids = drinkEntries.filter((e) => e.groupId === groupId).map((e) => e.id);
+    await Promise.all(ids.map((id) => fetch(`/api/drink-entries?id=${id}`, { method: "DELETE" })));
+    setDrinkEntries((prev) => prev.filter((e) => e.groupId !== groupId));
+    toast.success("Gelöscht");
+  }
+
   async function fixAlcoholfreeEntries() {
     const res = await fetch("/api/drink-entries", {
       method: "PATCH",
@@ -284,8 +318,16 @@ export default function TrinkenPage() {
     }
   }
 
+  const seenGroups = new Set<string>();
+  const dedupedDrinkEntries = drinkEntries.filter((e) => {
+    if (!e.groupId) return true;
+    if (seenGroups.has(e.groupId)) return false;
+    seenGroups.add(e.groupId);
+    return true;
+  });
+
   const feed: FeedItem[] = [
-    ...drinkEntries.map((e) => ({ ...e, type: "drink" as const })),
+    ...dedupedDrinkEntries.map((e) => ({ ...e, type: "drink" as const })),
     ...vomitEntries.map((e) => ({ ...e, type: "vomit" as const })),
   ].sort((a, b) => {
     const aTime = a.type === "drink" ? a.consumedAt : a.recordedAt;
@@ -351,19 +393,46 @@ export default function TrinkenPage() {
               </div>
             );
           }
-          const isOwn = item.profile.id === currentProfile?.id;
+          const groupMembers = item.groupId ? drinkEntries.filter((e) => e.groupId === item.groupId) : [item];
+          const isGroup = item.groupId && groupMembers.length > 1;
+          const isOwn = groupMembers.some((m) => m.profile.id === currentProfile?.id);
           const keeper = item.timekeeperId ? profiles.find((p) => p.id === item.timekeeperId) : null;
           return (
             <div key={item.id} className={cn("card", item.isTrichter && "border-yellow-400/40 bg-yellow-900/10")}>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
-                  style={{ backgroundColor: item.profile.avatarColor + "33", color: item.profile.avatarColor }}>
-                  {item.profile.nickname[0].toUpperCase()}
-                </div>
+                {isGroup ? (
+                  <div className="flex -space-x-2 flex-shrink-0">
+                    {groupMembers.map((m) => (
+                      <div key={m.id} className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border-2 border-[#1A2F45]"
+                        style={{ backgroundColor: m.profile.avatarColor + "33", color: m.profile.avatarColor }}>
+                        {m.profile.nickname[0].toUpperCase()}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                    style={{ backgroundColor: item.profile.avatarColor + "33", color: item.profile.avatarColor }}>
+                    {item.profile.nickname[0].toUpperCase()}
+                  </div>
+                )}
                 <div className="flex-1">
                   <div className="font-semibold text-sm">
-                    <span style={{ color: item.profile.avatarColor }}>{item.profile.nickname}</span>
-                    {item.isTrichter && <span className="ml-1 text-yellow-400">🍺 Trichter!</span>}
+                    {isGroup ? (
+                      <>
+                        {groupMembers.map((m, i) => (
+                          <span key={m.id}>
+                            {i > 0 && <span className="text-white/40"> & </span>}
+                            <span style={{ color: m.profile.avatarColor }}>{m.profile.nickname}</span>
+                          </span>
+                        ))}
+                        <span className="ml-1 text-yellow-400">🍺🍺 Doppeltrichter!</span>
+                      </>
+                    ) : (
+                      <>
+                        <span style={{ color: item.profile.avatarColor }}>{item.profile.nickname}</span>
+                        {item.isTrichter && <span className="ml-1 text-yellow-400">🍺 Trichter!</span>}
+                      </>
+                    )}
                   </div>
                   <div className="text-white/80 text-sm">
                     {item.drink.name} · {item.volumeMl}ml · {item.alcoholPercent}%
@@ -381,7 +450,7 @@ export default function TrinkenPage() {
                   </p>
                 </div>
                 {isOwn && (
-                  <button onClick={() => deleteEntry(item.id)} className="text-white/20 hover:text-red-400 p-2">
+                  <button onClick={() => (isGroup ? deleteGroupEntry(item.groupId!) : deleteEntry(item.id))} className="text-white/20 hover:text-red-400 p-2">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 )}
@@ -418,12 +487,18 @@ export default function TrinkenPage() {
                   <h2 className="text-xl font-bold">🍺 Wer trichtert?</h2>
                   <button onClick={() => setTrichterOpen(false)} className="text-white/30 p-1"><Plus className="w-5 h-5 rotate-45" /></button>
                 </div>
+                <button
+                  onClick={() => { setDoppelMode(!doppelMode); setSelectedProfiles([]); }}
+                  className={cn("w-full mb-4 py-3 rounded-2xl border-2 font-bold text-sm transition-all active:scale-95",
+                    doppelMode ? "bg-yellow-400/20 border-yellow-400 text-yellow-400" : "bg-[#0D1B2A] border-white/20 text-white/60")}>
+                  🍺🍺 Doppeltrichter {doppelMode ? `(${selectedProfiles.length}/2 ausgewählt)` : ""}
+                </button>
                 <div className="grid grid-cols-3 gap-3">
                   {profiles.map((p) => (
                     <button key={p.id}
-                      onClick={() => { setSelectedProfile(p); setTrichterStep("details"); }}
+                      onClick={() => selectTrichterPerson(p)}
                       className={cn("flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all active:scale-95",
-                        selectedProfile?.id === p.id ? "border-yellow-400 bg-yellow-400/10" : "border-white/10 bg-[#0D1B2A]")}>
+                        (doppelMode ? selectedProfiles.some((sp) => sp.id === p.id) : selectedProfile?.id === p.id) ? "border-yellow-400 bg-yellow-400/10" : "border-white/10 bg-[#0D1B2A]")}>
                       <div className="w-12 h-12 rounded-full flex items-center justify-center text-xl font-bold"
                         style={{ backgroundColor: p.avatarColor + "33", color: p.avatarColor }}>
                         {p.nickname[0].toUpperCase()}
@@ -436,12 +511,12 @@ export default function TrinkenPage() {
             )}
 
             {/* Details step */}
-            {trichterStep === "details" && selectedProfile && (
+            {trichterStep === "details" && (doppelMode ? selectedProfiles.length === 2 : !!selectedProfile) && (
               <div className="p-6">
                 <button onClick={() => setTrichterStep("person")} className="text-white/40 text-sm mb-4 flex items-center gap-1">
-                  ← {selectedProfile.nickname}
+                  ← {doppelMode ? selectedProfiles.map((p) => p.nickname).join(" & ") : selectedProfile?.nickname}
                 </button>
-                <h2 className="text-xl font-bold mb-5">🍺 Trichter Details</h2>
+                <h2 className="text-xl font-bold mb-5">{doppelMode ? "🍺🍺 Doppeltrichter Details" : "🍺 Trichter Details"}</h2>
                 <div className="space-y-5">
                   {/* Size */}
                   <div>
@@ -493,7 +568,7 @@ export default function TrinkenPage() {
                   <div>
                     <label className="text-sm text-yellow-400/80 mb-2 block font-semibold">Timekeeper (optional)</label>
                     <div className="flex gap-2 overflow-x-auto pb-1">
-                      {profiles.filter((p) => p.id !== selectedProfile?.id).map((p) => (
+                      {profiles.filter((p) => !(doppelMode ? selectedProfiles.some((sp) => sp.id === p.id) : p.id === selectedProfile?.id)).map((p) => (
                         <button key={p.id} onClick={() => setTimekeeperId(timekeeperId === p.id ? null : p.id)}
                           className={cn("flex flex-col items-center gap-1 p-2 rounded-xl border-2 flex-shrink-0 transition-all",
                             timekeeperId === p.id ? "border-yellow-400 bg-yellow-400/10" : "border-white/10 bg-[#0D1B2A]")}>
@@ -509,7 +584,7 @@ export default function TrinkenPage() {
 
                   <button onClick={submitTrichterOnly} disabled={submitting}
                     className="w-full py-5 bg-yellow-400 text-[#0D1B2A] font-black text-xl rounded-2xl active:scale-95 transition-transform disabled:opacity-50">
-                    {submitting ? "..." : "🍺 Trichter eintragen!"}
+                    {submitting ? "..." : doppelMode ? "🍺🍺 Doppeltrichter eintragen!" : "🍺 Trichter eintragen!"}
                   </button>
                 </div>
               </div>

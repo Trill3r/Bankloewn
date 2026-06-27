@@ -61,6 +61,7 @@ model DrinkEntry {
   isTrichter      Boolean    @default(false)
   durationSeconds Int?
   timekeeperId    String?
+  groupId         String?
   tournamentId    String
   tournament      Tournament @relation(fields: [tournamentId], references: [id])
   createdAt       DateTime   @default(now())
